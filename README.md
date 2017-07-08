@@ -1,1 +1,1 @@
-MFNothing.io
+MFNothing
