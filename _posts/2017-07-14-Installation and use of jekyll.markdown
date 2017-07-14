@@ -58,6 +58,30 @@ gem install jekyll
 jekyll -v
 ```
 
+## github 上使用jekyll
+1. 根据网上的教程，建立一个跟你GitHub名字一样的仓库。
+```
+如我的GitHub 名字是 MFNothing
+我建立的仓库名字就是 MFNothing.github.io
+```
+2. 如果需要绑定域名的需要创建一个CNAME文件，然后填写你的域名地址。
+```
+如我的的域名是 MFNothing.cn
+```
+3. 你的域名管理端，也需要进行相应的设置，如我使用的是阿里云的，需要在管理中选择域名解析进行如下配置。
+![](/img/in-mpost/Installation-and-use-of-jekyll/jekyll_The-domain-name.jpeg)
+4. 把这个仓库克隆到本地，然后使用你下载的模板进行替换
+```
+git clone xxxx (xxxx代表你的仓库的地址)
+```
+5. 最后上传你的修改就可以了,第一次会输入你的用户名和密码
+```
+git add ./
+git commit -m "xxxx"
+git push
+```
+
+
 ### 其中会遇到的问题
 
 #### 错误1 jekyll-paginate
