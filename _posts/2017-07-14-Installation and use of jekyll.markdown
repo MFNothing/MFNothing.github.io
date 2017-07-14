@@ -12,7 +12,7 @@ tags:
     - git
 ---
 
-##jekyll 的安装
+## jekyll 的安装
 
 在终端中一次输入
 
@@ -58,18 +58,18 @@ gem install jekyll
 jekyll -v
 ```
 
-###其中会遇到的问题
+### 其中会遇到的问题
 
-####错误1
-**Dependency Error:** Yikes! It looks like you don’t have jekyll-paginate or one of its dependencies installed. In order to use Jekyll as currently configured, you’ll need to install this gem. The full error message from Ruby is: ‘cannot load such file – jekyll-paginate’ If you run into trouble, you can find helpful resources at Getting Help
+#### 错误1
+** Dependency Error: ** Yikes! It looks like you don’t have jekyll-paginate or one of its dependencies installed. In order to use Jekyll as currently configured, you’ll need to install this gem. The full error message from Ruby is: ‘cannot load such file – jekyll-paginate’ If you run into trouble, you can find helpful resources at Getting Help
 jekyll 3.1.2 | Error: jekyll-paginate
 
-**解决办法：** 安装jekyll时候直接运行
+** 解决办法： ** 安装jekyll时候直接运行
 ```
 gem install jekyll-paginate即可解决。
 ```
-####错误2
-**Dependency Error: **  Yikes! It looks like you don't have redcarpet or one of its
+#### 错误2
+** Dependency Error:  **  Yikes! It looks like you don't have redcarpet or one of its
 dependencies installed. 
 
  In order to use Jekyll as currently configured, you'll n
@@ -85,19 +85,18 @@ redcarpet
 
 ERROR: YOUR SITE COULD NOT BE BUILT: redcarpet
 
-**解决办法：** _config.yml中的markdown改为kramdown
+** 解决办法： ** _config.yml中的markdown改为kramdown
 
 
-####错误3
+#### 错误3
 
-**jekyll 3.5.0 | Error:**  (/Users/lewei/Desktop/git blog/huxpro.github.io-master/_config.yml): did not find expected key while parsing a block mapping at line 2 column 1
+** jekyll 3.5.0 | Error: **  (/Users/lewei/Desktop/git blog/huxpro.github.io-master/_config.yml): did not find expected key while parsing a block mapping at line 2 column 1
 
-**中文**
-缩进的问题，第一行title之前需要一个空格
+** 中文 ** 缩进的问题，第一行title之前需要一个空格
 
 \*title: MFNothing Blog （\*号表示空格）
 
-**英文**Indentation is very important in Liquid, and you have to make sure you have the right amount of spaces when declaring collections.
+** 英文 ** Indentation is very important in Liquid, and you have to make sure you have the right amount of spaces when declaring collections.
 In your case, you have an extra space before - title: bla which is causing the error.
 i.e. you have:
 
