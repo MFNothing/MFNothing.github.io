@@ -89,8 +89,7 @@ ERROR: YOUR SITE COULD NOT BE BUILT: redcarpet
 
 
 #### 错误3 did not find expected key while parsing a block mapping at line 2 column 1
-
-**jekyll 3.5.0 | Error:** (/Users/lewei/Desktop/git blog/huxpro.github.io-master/_config.yml): did not find expected key while parsing a block mapping at line 2 column 1
+**jekyll Error:**(/Users/lewei/Desktop/git blog/huxpro.github.io-master/_config.yml): did not find expected key while parsing a block mapping at line 2 column 1
 
 **中文** 缩进的问题，第一行title之前需要一个空格
 
