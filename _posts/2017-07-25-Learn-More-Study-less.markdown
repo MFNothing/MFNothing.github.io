@@ -11,8 +11,6 @@ tags:
     - Learn More,Study Less
 ---
 
-
-![](/img/in-mpost/Installation-and-use-of-jekyll/jekyll_The-domain-name.jpeg)
 ## 前言
 
 读这本书是读了这个[博客作者](http://knightsj.github.io)文章，觉得他的学习方式很好，想要跟寻他的足迹，来开始我的学习路程。所以如果有雷同的地方，还请作者见谅，如果他能看的到的话。
