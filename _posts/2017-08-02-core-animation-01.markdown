@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "Core Animation 01的学习"
+title:      "Core Animation 01的学习————简单了解Core Animation"
 subtitle:   "Learning Core Animation"
 date:       2017-08-2 12:00:00
 author:     "MIN"
