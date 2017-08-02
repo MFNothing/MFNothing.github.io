@@ -76,15 +76,15 @@ CALayer可以说是UIView的内部实现细节。
 	UIView *smallView = [[UIView alloc] initWithFrame:CGRectMake(50, 50, 200, 200)];
 	smallView.backgroundColor = [[UIColor yellowColor] colorWithAlphaComponent:0.3];
 	// 添加到smallView的图层
-    CALayer *blueLayer = [CALayer layer];
-    blueLayer.backgroundColor = [[UIColor blueColor] colorWithAlphaComponent:0.3].CGColor;
-    blueLayer.frame = CGRectMake(50.0f, 50.0f, 100.0f, 100.0f);
-    [smallView.layer addSublayer:blueLayer];
-    // 添加到smallView的视图
-    UIView *ssView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 50, 50)];
-    ssView.backgroundColor = [[UIColor redColor] colorWithAlphaComponent:0.3];
-    [smallView addSubview:ssView];
-    [self.view addSubview:smallView];
+	CALayer *blueLayer = [CALayer layer];
+	blueLayer.backgroundColor = [[UIColor blueColor] colorWithAlphaComponent:0.3].CGColor;
+	blueLayer.frame = CGRectMake(50.0f, 50.0f, 100.0f, 100.0f);
+	[smallView.layer addSublayer:blueLayer];
+	// 添加到smallView的视图
+	UIView *ssView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 50, 50)];
+	ssView.backgroundColor = [[UIColor redColor] colorWithAlphaComponent:0.3];
+	[smallView addSubview:ssView];
+	[self.view addSubview:smallView];
 }
 @end
 ```
