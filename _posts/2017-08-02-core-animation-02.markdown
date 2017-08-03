@@ -2,7 +2,7 @@
 layout:     post
 title:      "Core Animation 02的学习————寄宿图"
 subtitle:   "Learning Core Animation"
-date:       2017-08-2 12:00:00
+date:       2017-08-02 12:00:00
 author:     "MIN"
 header-img: "img/post-bg-nextgen-web-pwa.jpg"
 header-mask: 0.3
