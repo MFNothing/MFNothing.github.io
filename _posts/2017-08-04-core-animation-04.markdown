@@ -161,6 +161,68 @@ CALayer有三种拉伸过滤的方法：
 
 #### LED钟表demo
 
+```
+layer.magnificationFilter = kCAFilterNearest;
+```
+**kCAFilterNearest**使用的地方，当那种比较规整的图片放大或缩小的的时候，就可以用。
+
+![](/img/in-mpost/Core-Animation-04/number1.png)
+
+下面使用上面的数字图显示当前时间
+
+没插入语句的效果图
+![](/img/in-mpost/Core-Animation-04/kCAFilterLinear.png)
+
+插入语句的效果图
+![](/img/in-mpost/Core-Animation-04/kCAFilterNearest.png)
+
+代码
+```
+@interface ViewController ()
+@property (nonatomic, strong) NSMutableArray *digitViews;
+@property (nonatomic, weak) NSTimer *timer;
+@end
+@implementation ViewController
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    UIImage *digits = [UIImage imageNamed:@"number"];
+    self.digitViews = [NSMutableArray array];
+    int x = 0;
+    for (int i = 0; i < 6; i++) {
+        x += 75;
+        UIView *digitView = [[UIView alloc]initWithFrame:CGRectMake(x + i / 2 * 20, 100, 75, 100)];
+        [digitView setBackgroundColor:[[UIColor yellowColor] colorWithAlphaComponent:0.3]];
+        digitView.layer.contents = (__bridge id)digits.CGImage;
+        digitView.layer.contentsRect = CGRectMake(0, 0, 0.1, 1.0);
+        digitView.layer.contentsGravity = kCAGravityResizeAspect;
+        // 插入位置
+        //digitView.layer.magnificationFilter = kCAFilterNearest;
+        [self.view addSubview:digitView];
+        [self.digitViews addObject:digitView];
+    }
+    self.timer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(tick) userInfo:nil repeats:YES];
+    [self tick];
+}
+- (void)setDigit:(NSInteger)digit forView:(UIView *)view
+{
+    view.layer.contentsRect = CGRectMake(digit * 0.1, 0, 0.1, 1.0);
+}
+- (void)tick
+{
+    NSCalendar *calendar = [[NSCalendar alloc] initWithCalendarIdentifier: NSCalendarIdentifierGregorian];
+    NSUInteger units = NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond;
+    NSDateComponents *components = [calendar components:units fromDate:[NSDate date]];
+    //set hours
+    [self setDigit:components.hour / 10 forView:self.digitViews[0]];
+    [self setDigit:components.hour % 10 forView:self.digitViews[1]];
+    //set minutes
+    [self setDigit:components.minute / 10 forView:self.digitViews[2]];
+    [self setDigit:components.minute % 10 forView:self.digitViews[3]];
+    //set seconds
+    [self setDigit:components.second / 10 forView:self.digitViews[4]];
+    [self setDigit:components.second % 10 forView:self.digitViews[5]];
+}
+```
 
 
 
