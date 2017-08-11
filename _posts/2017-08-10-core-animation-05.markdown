@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "Core Animation 04的学习————变换"
+title:      "Core Animation 05的学习————变换"
 subtitle:   "Learning Core Animation"
 date:       2017-08-10 12:00:00
 author:     "MIN"
@@ -148,7 +148,7 @@ CATransform3D transform = CATransform3DMakeRotation(M_PI_4, 1, 1, 1) ;
 view.layer.transform = transform;
 ```
 效果图
-![](/img/in-mpost/Core-Animation-05/3DRatation.png)
+![](/img/in-mpost/Core-Animation-05/3DRotation.png)
 
 
 
