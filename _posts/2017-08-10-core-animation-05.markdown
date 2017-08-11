@@ -151,6 +151,201 @@ view.layer.transform = transform;
 ![](/img/in-mpost/Core-Animation-05/ThreeDRotation.png)
 
 
+#### 透视投影
+
+```
+struct CATransform3D
+{
+  CGFloat m11, m12, m13, m14;
+  CGFloat m21, m22, m23, m24;
+  CGFloat m31, m32, m33, m34;
+  CGFloat m41, m42, m43, m44;
+};
+typedef struct CATransform3D CATransform3D;
+```
+
+在这个结构体中，m34是用来做透视的。
+
+m34的默认值是0，我们可以通过设置m34为-1.0 / d来应用透视效果，d代表了想象中视角相机和屏幕之间的距离，以像素为单位，那应该如何计算这个距离呢？实际上并不需要，大概估算一个就好了。
+
+视角相机的位置会在下面介绍，一般位于视图的中央。
+
+#### 灭点
+
+**灭点**：指的是立体图形各条边的延伸线所产生的相交点。
+
+当立方体离我们越来越远的时候，它就会不断变小，直到跟灭点一样看不见。（参照透视图）
+
+Core Animation定义了这个点位于变换图层的anchorPoint这就是说，当图层发生变换时，这个点永远位于图层变换之前anchorPoint的位置。
+
+改变position，也会使灭点改变，做3D变换的时候要时刻记住这一点，当你视图通过调整m34来让它更加有3D效果，应该首先把它放置于屏幕中央，然后通过平移来把它移动到指定位置（而不是直接改变它的position），这样所有的3D图层都共享一个灭点。
+
+#### sublayerTransform
+
+这个是设置所有子视图透视的m34值的。这个属性可以确保在变换之前都在屏幕中央共享同一个position。
+
+```
+CATransform3D perspective = CATransform3DIdentity;
+perspective.m34 = - 1.0 / 500.0;
+view.layer.sublayerTransform = perspective;
+rightView.layer.transform = CATransform3DMakeRotation(-M_PI_4, 0, 1, 0);
+leftView.layer.transform = CATransform3DMakeRotation(M_PI_4, 0, 1, 0);
+```
+效果图
+![](/img/in-mpost/Core-Animation-05/sublayerTransform.png)
+
+
+#### 背面
+
+通过以Y为轴3D旋转180度，我们可以看见视图的背面，与正面是一个镜面的效果。
+
+在Layer中我们可以通过设置doubleSided来控制是否绘制背面，默认为YES。设置为NO后，翻面过去什么都没有显示了。
+
+
+#### 扁平化图层
+
+在二维不存在扁平化，本来就是扁的。但是在三维中，绘制在屏幕的视图其实是一个平面，只是看起来像在做3D变换。
+
+比如下面这个例子，父视图以Y轴旋转45度，子视图想通过反向旋转抵消父视图的旋转效果。
+
+```
+	// 设置透视点
+	CATransform3D subTransform = CATransform3DIdentity;
+	subTransform.m34 = -1.0 / 500;
+	self.view.layer.sublayerTransform = subTransform;
+	// 创建效果视图
+	CGFloat width = CGRectGetWidth(self.view.frame) / 2;
+	UIView *superView = [[UIView alloc]initWithFrame:CGRectMake(width + 50, 300, 100, 100)];
+	superView.backgroundColor = [[UIColor grayColor] colorWithAlphaComponent:0.5];
+	UIView *subView = [[UIView alloc]initWithFrame:CGRectMake(25, 25, 50, 50)];
+	subView.backgroundColor = [[UIColor yellowColor] colorWithAlphaComponent:0.5];
+	[superView addSubview:subView];
+	[self.view addSubview:superView];
+    superView.layer.transform = CATransform3DMakeRotation(M_PI_4, 0, 1, 0);
+	subView.layer.transform = CATransform3DMakeRotation(-M_PI_4, 0, 1, 0);
+	// 对比视图
+	UIView *superView1 = [[UIView alloc]initWithFrame:CGRectMake(width - 150, 300, 100, 100)];
+	superView1.backgroundColor = [[UIColor grayColor] colorWithAlphaComponent:0.5];
+	UIView *subView1 = [[UIView alloc]initWithFrame:CGRectMake(25, 25, 50, 50)];
+	subView1.backgroundColor = [[UIColor yellowColor] colorWithAlphaComponent:0.5];
+	[superView1 addSubview:subView1];
+	[self.view addSubview:superView1];
+```
+
+效果图
+![](/img/in-mpost/Core-Animation-05/flattening.png)
+
+旋转的效果并没有被抵消，是因为视图在屏幕中已经扁平化了，子视图旋转的时候，已经不是原来的大小了，虽然它旋转了回去。
+
+所有场景里面绘制的东西并不会随着你观察它的角度改变而发生变化；图层也是同样的道理。
+
+这使得用Core Animation创建非常复杂的3D场景变得十分困难。你不能够使用图层树去创建一个3D结构的层级关系--在相同场景下的任何3D表面必须和同样的图层保持一致，这是因为每个的父视图都把它的子视图扁平化了。
+
+
+### 固体对象
+
+```
+@interface ViewController ()
+@property (nonatomic, strong) NSMutableArray *viewArrs;
+@end
+@implementation ViewController
+- (void)viewDidLoad {
+	[super viewDidLoad];
+	// 初始化UI
+	[self initUI];
+	// 设置透视点
+	CATransform3D perspective = CATransform3DIdentity;
+	perspective.m34 = -1.0 / 500;
+	perspective = CATransform3DRotate(perspective, -M_PI_4, 1, 0, 0);
+	perspective = CATransform3DRotate(perspective, -M_PI_4, 0, 1, 0);
+	self.view.layer.sublayerTransform = perspective;
+	// 设置视图 1
+	CATransform3D transform = CATransform3DMakeTranslation(0, 0, 50);
+	[self setTransform:transform atIndex:0];
+	// 设置视图 2
+	transform = CATransform3DMakeTranslation(50, 0, 0);
+	transform = CATransform3DRotate(transform, M_PI_2, 0, 1, 0);
+	[self setTransform:transform atIndex:1];
+	// 设置视图 3
+	transform = CATransform3DMakeTranslation(0, -50, 0);
+	transform = CATransform3DRotate(transform, M_PI_2, 1, 0, 0);
+	[self setTransform:transform atIndex:2];
+	// 设置视图 4
+	transform = CATransform3DMakeTranslation(0, 50, 0);
+	transform = CATransform3DRotate(transform, -M_PI_2, 1, 0, 0);
+	[self setTransform:transform atIndex:3];
+	// 设置视图 5
+	transform = CATransform3DMakeTranslation(-50, 0, 0);
+	transform = CATransform3DRotate(transform, -M_PI_2, 0, 1, 0);
+	[self setTransform:transform atIndex:4];
+	// 设置视图 6
+	transform = CATransform3DMakeTranslation(0, 0, -50);
+	transform = CATransform3DRotate(transform, M_PI, 0, 1, 0);
+	[self setTransform:transform atIndex:5];
+}
+- (void)setTransform:(CATransform3D)transform atIndex:(NSInteger)index
+{
+	UIView *view = self.viewArrs[index];
+	view.layer.transform = transform;
+}
+- (void)initUI
+{
+	self.viewArrs = [NSMutableArray array];
+	CGFloat width = CGRectGetWidth(self.view.frame) / 2;
+	CGFloat height = CGRectGetHeight(self.view.frame) / 2;
+	for (int i = 0; i < 6; i++) {
+		UIView *view = [[UIView alloc] initWithFrame:CGRectMake(width - 50, height - 50, 100, 100)];
+		view.layer.borderColor = [UIColor blackColor].CGColor;
+		view.layer.borderWidth = 5.0f;
+		view.backgroundColor = [[UIColor yellowColor]colorWithAlphaComponent:0.8];
+		UIButton *numberButton = [[UIButton alloc] initWithFrame:CGRectMake(0, 0, 100, 100)];
+		[numberButton addTarget:self action:@selector(buttonClick:) forControlEvents:UIControlEventTouchUpInside];
+		numberButton.tag = i;
+		UILabel *numberLabel = [[UILabel alloc] initWithFrame:CGRectMake(25, 25, 50, 50)];
+		numberLabel.textColor = [UIColor blackColor];
+		numberLabel.font = [UIFont systemFontOfSize:20];
+		numberLabel.textAlignment = NSTextAlignmentCenter;
+		numberLabel.text = [NSString stringWithFormat:@"%d", i + 1];
+		[view addSubview:numberButton];
+		[view addSubview:numberLabel];
+		[self.viewArrs addObject:view];
+		[self.view addSubview:view];
+	}
+}
+- (void)buttonClick:(id)sender
+{
+	UIButton *button = (UIButton *)sender;
+	NSLog(@"button %ld", button.tag + 1);
+}
+@end
+```
+
+
+效果图
+
+![](/img/in-mpost/Core-Animation-05/fixModel.png)
+
+### 点击事件
+
+点击事件的处理是由视图在父视图的顺序决定的，并不是3D空间中的Z轴顺序。所以当我们想点击3时，会被4、5、6拦截(取决于点击位置)，如果4、5、6有方法可以响应的话。事件响应并不会因为变换的操作而发生改变。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
