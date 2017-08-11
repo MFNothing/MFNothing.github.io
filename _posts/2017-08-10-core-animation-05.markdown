@@ -148,7 +148,7 @@ CATransform3D transform = CATransform3DMakeRotation(M_PI_4, 1, 1, 1) ;
 view.layer.transform = transform;
 ```
 效果图
-![](/img/in-mpost/Core-Animation-05/3DRotation.png)
+![](/img/in-mpost/Core-Animation-05/ThreeDRotation.png)
 
 
 
