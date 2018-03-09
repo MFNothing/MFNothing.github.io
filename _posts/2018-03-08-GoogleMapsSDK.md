@@ -537,32 +537,32 @@ mapView.settings.zoomGestures = NO;
 
 ```
 - (void)animateToNextCoord:(GMSMarker *)marker {
-			CoordsList *coords = marker.userData; // @property(nonatomic, strong) id GMS_NULLABLE_PTR userData; 随便自定义的类型都可以
-			// 下一个点的位置
-    		CLLocationCoordinate2D coord = [coords next]; 
-    		// 当前的位置
-    		CLLocationCoordinate2D previous = marker.position;
-    		// 角度
-			CLLocationDirection heading = GMSGeometryHeading(previous, coord);
-			// 距离
-            CLLocationDistance distance = GMSGeometryDistance(previous, coord);
-            if (marker.flat) {
-                marker.rotation = heading;
-            }
-            // Use CATransaction to set a custom duration for this animation. By default, changes to the
-            // position are already animated, but with a very short default duration. When the animation is
-            // complete, trigger another animation step.
-            [CATransaction begin];
-            // 计算速度
-            [CATransaction setAnimationDuration:(distance / (22 + self.speed * 2))];
-            __weak ViewConroller *weakSelf = self;
-            [CATransaction setCompletionBlock:^{
-                if (isAnimate == YES) { // 判断是否还可以继续执行
-                    [weakSelf animateToNextCoord:marker];
-                }
-            }];
-            marker.position = coord;
-            [CATransaction commit];
+	CoordsList *coords = marker.userData; // @property(nonatomic, strong) id GMS_NULLABLE_PTR userData; 随便自定义的类型都可以
+	// 下一个点的位置
+	CLLocationCoordinate2D coord = [coords next]; 
+	// 当前的位置
+	CLLocationCoordinate2D previous = marker.position;
+	// 角度
+	CLLocationDirection heading = GMSGeometryHeading(previous, coord);
+	// 距离
+	CLLocationDistance distance = GMSGeometryDistance(previous, coord);
+	if (marker.flat) {
+		marker.rotation = heading;
+	}
+	// Use CATransaction to set a custom duration for this animation. By default, changes to the
+	// position are already animated, but with a very short default duration. When the animation is
+	// complete, trigger another animation step.
+	[CATransaction begin];
+	// 计算速度
+	[CATransaction setAnimationDuration:(distance / (22 + self.speed * 2))];
+	__weak ViewConroller *weakSelf = self;
+  	[CATransaction setCompletionBlock:^{
+		if (isAnimate == YES) { // 判断是否还可以继续执行
+		[weakSelf animateToNextCoord:marker];
+		}
+	}];
+	marker.position = coord;
+	[CATransaction commit];
 }
 ```
 
