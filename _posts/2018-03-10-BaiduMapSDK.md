@@ -449,7 +449,7 @@ end
 
 ```
 //个性化地图模板文件路径
-    NSString* path = [[NSBundle mainBundle] pathForResource:@"custom_config" ofType:@""];
+NSString* path = [[NSBundle mainBundle] pathForResource:@"custom_config" ofType:@""];
 //设置个性化地图样式
 [BMKMapView customMapStyle:path];
 ```
@@ -665,7 +665,49 @@ self.mapView.gesturesEnabled = NO;
     }
 }
 ```
+### 显示完整地图中的内容
 
+```
+#import <BaiduMapAPI_Utils/BMKUtilsComponent.h>
+
+// CLLocationCoordinate2D是一个结构体，不能保存到数组头
+@interface MINCoordinateObject : NSObject
+@property (nonatomic, assign) CLLocationCoordinate2D coordinate;
+@end
+@implementation MINCoordinateObject
+@end
+
+// 使百度地图展示完整的围栏，位置位置并处于地图中心
+- (void)baiduMapFitFence:(NSArray *)modelArr
+{
+    MINCoordinateObject *firstModel = modelArr.firstObject;
+    BMKMapPoint firstPoint = BMKMapPointForCoordinate( firstModel.coordinate);
+    CGFloat leftX, leftY, rightX, rightY; // 最左或右边的X、Y
+    rightX = leftX = firstPoint.x;
+    rightY = leftY = firstPoint.y;
+    for (int i = 1; i < modelArr.count; i++) {
+        MINCoordinateObject *model = modelArr[i];
+        BMKMapPoint modelPoint = BMKMapPointForCoordinate( model.coordinate);
+        if (modelPoint.x < leftX) {
+            leftX = modelPoint.x;
+        }
+        if (modelPoint.x > rightX) {
+            rightX = modelPoint.x;
+        }
+        if (modelPoint.y > leftY) {
+            leftY = modelPoint.y;
+        }
+        if (modelPoint.y < rightY) {
+            rightY = modelPoint.y;
+        }
+    }
+    BMKMapRect fitRect;
+    fitRect.origin = BMKMapPointMake(leftX, leftY);
+    fitRect.size = BMKMapSizeMake(rightX - leftX, rightY - leftY);
+    [_baiduMapView setVisibleMapRect: fitRect];
+    _baiduMapView.zoomLevel = _baiduMapView.zoomLevel - 0.3;
+}
+```
 
 
 

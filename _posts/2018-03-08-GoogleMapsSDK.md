@@ -601,6 +601,29 @@ mapView.settings.zoomGestures = NO;
 
 ```
 
+### 地图显示所有标记
+
+```
+- (void)googleMapFitFence:(NSArray *)modelArr
+{
+    GMSCoordinateBounds *bounds = [[GMSCoordinateBounds alloc] init];
+    for (MINCoordinateObject *model in modelArr) {
+        bounds = [bounds includingCoordinate: model.coordinate];
+    }
+    [_googleMapView animateWithCameraUpdate: [GMSCameraUpdate fitBounds: bounds withPadding: 30.0f]];
+}
+
+- (void)googleMapFitCircleFence:(MINCoordinateObject *)model radius:(double)radius
+{
+    GMSCoordinateBounds *bounds = [[GMSCoordinateBounds alloc] init];
+    bounds = [bounds includingCoordinate: model.coordinate];
+    CGFloat zoomLevel = [GMSCameraPosition zoomAtCoordinate: model.coordinate forMeters: radius perPoints: 50];
+    [_googleMapView animateWithCameraUpdate: [GMSCameraUpdate fitBounds: bounds withPadding: 30.0f]];
+    [_googleMapView animateToZoom: zoomLevel];
+    
+}
+```
+
 
 
 
