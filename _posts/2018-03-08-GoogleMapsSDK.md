@@ -624,6 +624,20 @@ mapView.settings.zoomGestures = NO;
 }
 ```
 
+### 常用的一些东西
+
+#### 计算两个坐标点之间的距离和角度
+
+```
+	// 下一个点的位置
+	CLLocationCoordinate2D coord = LocationCoordinate2DMake(lat, lng); 
+	// 当前的位置
+	CLLocationCoordinate2D previous = LocationCoordinate2DMake(lat, lng);
+	// 角度
+	CLLocationDirection heading = GMSGeometryHeading(previous, coord);
+	// 距离
+	CLLocationDistance distance = GMSGeometryDistance(previous, coord);
+```
 
 
 

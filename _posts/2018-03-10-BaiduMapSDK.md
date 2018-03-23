@@ -677,7 +677,7 @@ self.mapView.gesturesEnabled = NO;
 @implementation MINCoordinateObject
 @end
 
-// 使百度地图展示完整的围栏，位置位置并处于地图中心
+// 使百度地图展示完整的多个位置的坐标
 - (void)baiduMapFitFence:(NSArray *)modelArr
 {
     MINCoordinateObject *firstModel = modelArr.firstObject;
@@ -707,8 +707,46 @@ self.mapView.gesturesEnabled = NO;
     [_baiduMapView setVisibleMapRect: fitRect];
     _baiduMapView.zoomLevel = _baiduMapView.zoomLevel - 0.3;
 }
+
+// 圆形围栏中心位于地图中心，并可以完整展示
+- (void)baiduMapFitCircleFence:(MINCoordinateObject *)model radius:(double)radius
+{
+    // 一个点的长度是0.870096
+    BMKMapPoint circlePoint = BMKMapPointForCoordinate(model.coordinate);
+    BMKMapRect fitRect;
+    double pointRadius = radius / 0.870096;
+    fitRect.origin = BMKMapPointMake(circlePoint.x - pointRadius, circlePoint.y - pointRadius);
+    fitRect.size = BMKMapSizeMake(pointRadius * 2, pointRadius * 2);
+    [_baiduMapView setVisibleMapRect: fitRect];
+    _baiduMapView.zoomLevel = _baiduMapView.zoomLevel - 0.3;
+}
 ```
 
+### 常用的一些东西
+
+#### 计算两个坐标点之间的距离
+
+```
+#import <BaiduMapAPI_Utils/BMKUtilsComponent.h>
+
+BMKMapPoint point1 = BMKMapPointForCoordinate(CLLocationCoordinate2DMake(39.915,116.404));
+BMKMapPoint point2 = BMKMapPointForCoordinate(CLLocationCoordinate2DMake(38.915,115.404));
+CLLocationDistance distance = BMKMetersBetweenMapPoints(point1,point2);
+
+// 旋转角度
+
+角度计算可以通过那两个point转换成CGPoint来计算
+CGFloat angleBetweenPoints(CGPoint first, CGPoint second) {
+    CGFloat height = second.y - first.y;
+    CGFloat width = first.x - second.x;
+    CGFloat rads = atan(height/width);
+    return radiansToDegrees(rads);
+}
+
+// 向右边旋转45°
+CGFloat angle = angleBetweenPoints(CGPointMake(0, 0), CGPointMake(0, 1));
+sportAnnotationView.imageView.transform = CGAffineTransformMakeRotation(angle / 180 * M_PI);
+```
 
 
 
