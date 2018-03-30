@@ -748,6 +748,16 @@ CGFloat angle = angleBetweenPoints(CGPointMake(0, 0), CGPointMake(0, 1));
 sportAnnotationView.imageView.transform = CGAffineTransformMakeRotation(angle / 180 * M_PI);
 ```
 
+#### view转换图片
 
+```
+-(UIImage *)getImageFromView:(UIView *)view{
+    UIGraphicsBeginImageContext(view.bounds.size);
+    [view.layer renderInContext:UIGraphicsGetCurrentContext()];
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return image;
+}
+```
 
 

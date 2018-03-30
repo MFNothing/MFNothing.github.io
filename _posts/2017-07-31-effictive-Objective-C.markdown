@@ -169,7 +169,9 @@ typedef NS_OPTIONS(NSUInteger, EOCPermittedDirection){
 ```
 #### @synthesize
 
-同时编译器还要自动向勒种添加适当类型的实例变量： _firstName 和 _lastName
+编译器会自动编写访问这些属性所需的方法（get和set方法）
+
+同时编译器还要自动向类中添加适当类型的实例变量： _firstName 和 _lastName
 
 可以通过@synthesize语法来指定实例变量的名字（但是现在一般没有人用了）
 
