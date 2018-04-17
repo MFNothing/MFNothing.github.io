@@ -759,5 +759,14 @@ sportAnnotationView.imageView.transform = CGAffineTransformMakeRotation(angle / 
     return image;
 }
 ```
+#### 点击事件 记住设置annotation的title
+
+```
+- (void)mapView:(BMKMapView *)mapView didSelectAnnotationView:(BMKAnnotationView *)view
+{
+    NSLog(@"-----------");
+ 	// 没有设置title不是响应这个方法
+}
+```
 
 
