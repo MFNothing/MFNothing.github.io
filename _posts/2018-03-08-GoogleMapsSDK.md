@@ -638,7 +638,28 @@ mapView.settings.zoomGestures = NO;
 	// 距离
 	CLLocationDistance distance = GMSGeometryDistance(previous, coord);
 ```
+### 导航跳转
 
+地图常用的URL Scheme :
+
+1. 苹果自带地图（不需要检测，所以不需要URL Scheme）
+2. 百度地图 ：baidumap://
+3. 高德地图 ：iosamap://
+4. 谷歌地图 ：comgooglemaps://
+
+
+增加一个URL Schemes
+
+```
+if ([[UIApplication sharedApplication] canOpenURL:
+             [NSURL URLWithString:@"comgooglemaps://"]]) {
+            [[UIApplication sharedApplication] openURL:
+             [NSURL URLWithString:[NSString stringWithFormat: @"comgooglemaps://maps?daddr=%lf,%lf&avoid=w&zoom=14", self.destination.lat,self. destination.lng]]];
+             //[NSURL URLWithString:[NSString stringWithFormat: @"comgooglemaps://maps?saddr=%lf,%lf&daddr=%lf,%lf&avoid=w&zoom=14",self.myLocation.latitude, self.myLocation.longitude, self.destination.lat,self.destination.lng]]];
+        }else {
+            [MINUtils showProgressHudToView: self.view withText: @"未安装谷歌地图"];
+        }
+```
 
 
 

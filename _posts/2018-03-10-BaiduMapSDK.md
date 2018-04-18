@@ -769,4 +769,26 @@ sportAnnotationView.imageView.transform = CGAffineTransformMakeRotation(angle / 
 }
 ```
 
+#### 导航跳转
+
+地图常用的URL Scheme :
+
+1. 苹果自带地图（不需要检测，所以不需要URL Scheme）
+2. 百度地图 ：baidumap://
+3. 高德地图 ：iosamap://
+4. 谷歌地图 ：comgooglemaps://
+
+
+增加一个URL Schemes
+
+```
+if ([[UIApplication sharedApplication] canOpenURL:
+             [NSURL URLWithString:@"baidumap://"]]) {
+            NSString *urlString = [[NSString stringWithFormat:@"baidumap://map/direction?origin={{我的位置}}&destination=latlng:%f,%f|name=目的地&mode=driving&coord_type=gcj02",self.model.lat, self.model.lng] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:urlString]];
+        }else {
+            [MINUtils showProgressHudToView: self.view withText: @"未安装百度地图"];
+        }
+```
+
 
