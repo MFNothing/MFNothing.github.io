@@ -356,3 +356,325 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 ## 内存管理
 ## 块与大中枢派发
 ## 系统框架
+
+### 多用块枚举，少用for循环
+
+#### 为什么不用for循环
+
+当for循环遍历NSDictionary 和 NSSet，无法通过整数下标直接访问其中的值。
+
+所以我们需要先通过 allKeys 或 allObjects去得到一个数组，通过遍历数组来遍历。多创建的数组就是额外不必要的开销。
+
+#### 使用NSEnumerator来遍历 Objective-C 1.0
+
+##### 数组
+
+```
+- (void)enumerateArr:(NSArray *)array
+{
+    NSEnumerator *enumerator = [array objectEnumerator];
+    // 反向遍历
+//    NSEnumerator *enumerator = [array reverseObjectEnumerator];
+    id object;
+    while ((object = [enumerator nextObject]) != nil) {
+        // Do something with "object"
+    }
+}
+```
+
+##### 字典
+
+```
+- (void)enumerateDictionary:(NSDictionary *)dictionary
+{
+    NSEnumerator *enumerator = [dictionary objectEnumerator];
+    // 反向遍历
+//    NSEnumerator *enumerator = [dictionary reverseObjectEnumerator];
+    id object;
+    while ((object = [enumerator nextObject]) != nil) {
+        // Do something with "object"
+    }
+}
+```
+
+#### NSSet
+
+```
+- (void)enumerateSet:(NSSet *)set
+{
+    NSEnumerator *enumerator = [set objectEnumerator];
+    // 反向遍历
+//    NSEnumerator *enumerator = [set reverseObjectEnumerator];
+    id object;
+    while ((object = [enumerator nextObject]) != nil) {
+        // Do something with "object"
+    }
+}
+```
+
+#### 快速遍历 for...in 
+
+缺点是无法直接拿到对象下标
+
+##### 数组
+
+```
+- (void)enumerateArrByForIn:(NSArray *)array
+{
+    for (id object in array) {
+        // Do something with "object"
+    }
+}
+```
+
+##### 字典
+
+```
+- (void)enumerateDictionaryByForIn:(NSDictionary *)dictionary
+{
+    for (id object in dictionary) {
+        // Do something with "object"
+    }
+}
+```
+
+#### NSSet
+
+```
+- (void)enumerateSetByForIn:(NSSet *)set
+{
+    for (id object in set) {
+        // Do something with "object"
+    }
+}
+```
+
+#### 块遍历
+
+```
+    /*
+     typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
+     NSEnumerationConcurrent = (1UL << 0), // 并行执行块，通过GCD实现
+     NSEnumerationReverse = (1UL << 1), // 反序遍历
+     };
+     */
+```
+
+##### 数组
+
+```
+- (void)enumerateArrUsingBlock:(NSArray *)array
+{
+    BOOL shouldStop = YES;
+    [array enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        if (shouldStop) {
+            *stop = YES;
+        }
+    }];
+    [array enumerateObjectsWithOptions: NSEnumerationReverse usingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        if (shouldStop) {
+            *stop = YES;
+        }
+    }];
+}
+```
+
+##### 字典
+
+```
+- (void)enumerateDictionaryUsingBlock:(NSDictionary *)dictionary
+{
+    BOOL shouldStop = YES;
+    [dictionary enumerateKeysAndObjectsUsingBlock:^(id  _Nonnull key, id  _Nonnull obj, BOOL * _Nonnull stop) {
+        if (shouldStop) {
+            *stop = YES;
+        }
+    }];
+    [dictionary enumerateKeysAndObjectsWithOptions: NSEnumerationConcurrent usingBlock:^(id  _Nonnull key, id  _Nonnull obj, BOOL * _Nonnull stop) {
+        if (shouldStop) {
+            *stop = YES;
+        }
+    }];
+}
+```
+
+#### NSSet
+
+```
+- (void)enumerateSetUsingBlock:(NSSet *)set
+{
+    BOOL shouldStop = YES;
+    [set enumerateObjectsUsingBlock:^(id  _Nonnull obj, BOOL * _Nonnull stop) {
+        if (shouldStop) {
+            *stop = YES;
+        }
+    }];
+    // 反向
+    [set enumerateObjectsWithOptions: NSEnumerationReverse usingBlock:^(id  _Nonnull obj, BOOL * _Nonnull stop) {
+        if (shouldStop) {
+            *stop = YES;
+        }
+    }];
+}
+```
+### 构建缓存时选用 NSCahche 而非 NSDictionary
+
+NSCache 的优势 :
+
+[NSCache相关基础参考](http://southpeak.github.io/2015/02/11/cocoa-foundation-nscache/) 
+
+1. 当系统资源将要耗尽的时候，它可以自动减删缓存，先行删减“最久未使用的”对象，但是可以在它的NSCacheDelegate代理方法中去对删除对象处理（存入Sqlite或CoreData）
+2. NSCache 不会拷贝键，而是持有它。set 在 NSCache 中的对象可以结合\< NSDiscardableContent >协议中的四个方法，让其对象在不被我们使用的时候，可以将其丢弃，以让程序占用更少的内容。通过设置 NSCache 的 evictsObjectsWithDiscardedContent 属性开启或关闭这种方式(默认是开启的)。后面会有相关方法的详细解释。
+  * - (BOOL)beginContentAccess;
+  * - (void)endContentAccess;
+  * - (void)discardContentIfPossible;
+  * - (BOOL)isContentDiscarded; 	
+3. 线程安全，多个线程可以同时访问NSCache
+4. 可以设置最大开销(最大对象个数或者最大内存使用大小)，大于这个开销会删减对象。
+
+如果缓存使用得当，应用程序的响应速度就能提高。只有那种“重新计算起来很费事的”数据，才值得放入缓存，比如那些需要从网络获取或从磁盘读取的数据
+
+
+#### NSDiscardableContent 协议
+
+一个NSDiscardableContent对象的生命周期依赖于一个“counter”变量。一个NSDiscardableContent对象实际是一个可清理内存块，这个内存记录了对象当前是否被其它对象使用。如果这块内存正在被读取，或者仍然被需要，则它的counter变量是大于或等于1的；当它不再被使用时，就可以丢弃，此时counter变量将等于0。当counter变量等于0时，如果当前时间点内存比较紧张的话，内存块就可能被丢弃。
+
+这个跟对象引用计数无关。这个“counter”变量只用于记录对象是否被其它对象使用。所以这个“counter”变量应该由我们自己来创建。
+
+所以在初始化对象的时候，我们需要将这个“counter”变量初始化为1。从这个点开始，我们就需要去跟踪counter变量的状态。通过协议声明的两个方法：beginContentAccess和endContentAccess
+
+* - (BOOL)beginContentAccess; //增加counter变量 函数的返回值如果是YES，则表明可丢弃内存仍然可用且已被成功访问；否则返回NO。
+* - (void)endContentAccess; // 该方法会减少对象的counter变量，通常是让对象的counter值变回为0，这样在对象的内容不再被需要时，就要以将其丢弃。所以在你还想使用这个对象的时候，要让counter变量大于0
+* - (void)discardContentIfPossible; // 当对象将要被丢弃的时候回调用这个方法，我们也可以主动调用这个方法，去做一些存储的事情，如果这个对象需要被存储在本地的话。这个方法会在NSCache代理方法后面执行。
+* - (BOOL)isContentDiscarded; // 会在我们需要调用这个NSDiscardableContent对象调用。这里我们可以根据count变量的值去判断，这个对象是否被丢弃，如果被丢弃就返回NO，如果没有就返回YES。
+	* 如果返回 NO，会去响应NSCache代理方法，然后会调用discardContentIfPossible方法。
+	* 如果返回 YES。
+
+这里要注意当我们调用 NSCache 的objectForKey方法的时候，会默认去调用key值所对应的对象的isContentDiscarded方法，如果返回NO，则不会执行beginContentAccess和endContentAccess方法了，而是去掉用 NSCache 对象的willEvictObject:代理方法，和丢弃对象的discardContentIfPossible方法。
+
+
+下面会简单的构建一个NSDiscardableContent对象
+
+```
+@interface CacheObject : NSObject <NSDiscardableContent>
+@property (nonatomic, assign) int counter;
+@property (nonatomic, assign) int num;
+@end
+#import "CacheObject.h"
+
+@interface CacheObject() 
+@end
+
+@implementation CacheObject
+- (instancetype)init
+{
+    if (self = [super init]) {
+        _counter = 1;
+    }
+    return self;
+}
+
+- (BOOL)beginContentAccess
+{
+    self.counter += 1;
+    NSLog(@"obj = %@ num = %d count = %d beginContentAccess", self, self.num, self.counter);
+    if (self.counter > 0) {
+        return YES;
+    }
+    return NO;
+}
+
+- (void)endContentAccess
+{
+    self.counter -= 1;
+    NSLog(@"obj = %@ num = %d count = %d  endContentAccess", self, self.num, self.counter);
+}
+
+- (void)discardContentIfPossible
+{
+    NSLog(@"obj = %@ num = %d count = %d  discardContentIfPossible", self, self.num, self.counter);
+}
+
+- (BOOL)isContentDiscarded
+{
+    NSLog(@"obj = %@ num = %d count = %d  isContentDiscarded", self, self.num, self.counter);
+    if (self.counter > 0) {
+        return NO;
+    }
+    return YES;
+}
+```
+
+简单的使用
+
+```
+- (void)TestNSCache
+{
+    NSCache *cache = [[NSCache alloc] init];
+    cache.delegate = self;
+//    self.cache.countLimit = 2; // 0 为不限制,这里如果不注释的话，第二个for循环就会开始丢弃对象了，注释后，会在这个函数执行完后丢弃所有对象，因为NSCache对象被释放了
+//    cache.evictsObjectsWithDiscardedContent = NO; // 默认为YES。 如果注释取消后，第二个for循环取出对象时不会去调用isContentDiscarded方法去判断对象是否被释放了
+    for (int i = 0; i < 4; i++) {
+        CacheObject *object = [[CacheObject alloc] init]; // 初始化后counter为1
+        object.num = i;
+        [cache setObject: object forKey: [NSNumber numberWithInt: i]];
+        NSLog(@"setting data %@ %d", object ,object.num);
+//        [obj endContentAccess]; 如果这里执行了，下面的beginContentAccess和endContentAccess不会执行
+        NSLog(@"--------------");
+    }
+    for (int i = 0; i < 4; i++) {
+        CacheObject *obj = [cache objectForKey: [NSNumber numberWithInt:i]];
+        [obj beginContentAccess]; // 让其增加，保证其他地方减一的时候，这里不会被释放
+        NSLog(@"using data %@ %d", obj ,obj.num);
+        [obj endContentAccess]; // 让其减一，当其他地方再调用时，如果为0，就回去执行丢弃的代理方法和discardContentIfPossible方法了
+        NSLog(@"***************");
+    }
+}
+```
+
+打印
+
+```
+2018-04-22 15:59:53.131463+0800 enumerateTest[6407:219822] setting data <CacheObject: 0x60800000deb0> 0
+2018-04-22 15:59:53.131622+0800 enumerateTest[6407:219822] --------------
+2018-04-22 15:59:53.131749+0800 enumerateTest[6407:219822] setting data <CacheObject: 0x60000000c6c0> 1
+2018-04-22 15:59:53.131833+0800 enumerateTest[6407:219822] --------------
+2018-04-22 15:59:53.131924+0800 enumerateTest[6407:219822] setting data <CacheObject: 0x60000000c760> 2
+2018-04-22 15:59:53.132004+0800 enumerateTest[6407:219822] --------------
+2018-04-22 15:59:53.132110+0800 enumerateTest[6407:219822] setting data <CacheObject: 0x60000000c780> 3
+2018-04-22 15:59:53.132188+0800 enumerateTest[6407:219822] --------------
+2018-04-22 15:59:53.132290+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60800000deb0> num = 0 count = 1  isContentDiscarded
+2018-04-22 15:59:53.132401+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60800000deb0> num = 0 count = 2 beginContentAccess
+2018-04-22 15:59:53.132499+0800 enumerateTest[6407:219822] using data <CacheObject: 0x60800000deb0> 0
+2018-04-22 15:59:53.132633+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60800000deb0> num = 0 count = 1  endContentAccess
+2018-04-22 15:59:53.132728+0800 enumerateTest[6407:219822] ***************
+2018-04-22 15:59:53.132813+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c6c0> num = 1 count = 1  isContentDiscarded
+2018-04-22 15:59:53.132930+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c6c0> num = 1 count = 2 beginContentAccess
+2018-04-22 15:59:53.133102+0800 enumerateTest[6407:219822] using data <CacheObject: 0x60000000c6c0> 1
+2018-04-22 15:59:53.133257+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c6c0> num = 1 count = 1  endContentAccess
+2018-04-22 15:59:53.133426+0800 enumerateTest[6407:219822] ***************
+2018-04-22 15:59:53.133630+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c760> num = 2 count = 1  isContentDiscarded
+2018-04-22 15:59:53.133811+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c760> num = 2 count = 2 beginContentAccess
+2018-04-22 15:59:53.133989+0800 enumerateTest[6407:219822] using data <CacheObject: 0x60000000c760> 2
+2018-04-22 15:59:53.134164+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c760> num = 2 count = 1  endContentAccess
+2018-04-22 15:59:53.134312+0800 enumerateTest[6407:219822] ***************
+2018-04-22 15:59:53.134583+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c780> num = 3 count = 1  isContentDiscarded
+2018-04-22 15:59:53.134754+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c780> num = 3 count = 2 beginContentAccess
+2018-04-22 15:59:53.134942+0800 enumerateTest[6407:219822] using data <CacheObject: 0x60000000c780> 3
+2018-04-22 15:59:53.135135+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c780> num = 3 count = 1  endContentAccess
+2018-04-22 15:59:53.135314+0800 enumerateTest[6407:219822] ***************
+2018-04-22 15:59:53.135562+0800 enumerateTest[6407:219822] willEvictObject obj = <CacheObject: 0x60800000deb0> num = 0
+2018-04-22 15:59:53.135657+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60800000deb0> num = 0 count = 1  discardContentIfPossible
+2018-04-22 15:59:53.135786+0800 enumerateTest[6407:219822] willEvictObject obj = <CacheObject: 0x60000000c6c0> num = 1
+2018-04-22 15:59:53.135962+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c6c0> num = 1 count = 1  discardContentIfPossible
+2018-04-22 15:59:53.136138+0800 enumerateTest[6407:219822] willEvictObject obj = <CacheObject: 0x60000000c760> num = 2
+2018-04-22 15:59:53.136264+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c760> num = 2 count = 1  discardContentIfPossible
+2018-04-22 15:59:53.136426+0800 enumerateTest[6407:219822] willEvictObject obj = <CacheObject: 0x60000000c780> num = 3
+2018-04-22 15:59:53.136602+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c780> num = 3 count = 1  discardContentIfPossible
+```
+
+
+
+
+
+
