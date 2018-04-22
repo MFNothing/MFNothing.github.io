@@ -13,7 +13,7 @@ tags:
 
 ## 熟悉 Objective-C
 
-### 第一条：了解 objective-C 语言的起源
+### 第1条：了解 objective-C 语言的起源
 
 objective-C 使用“消息结构”而非“函数调用”。
 
@@ -28,7 +28,7 @@ objective-C 使用“消息结构”而非“函数调用”。
 1. 其运行时所应执行的代码由编译器决定。
 2. 如果函数是多态的，那么运行时按照“虚函数表”来查出到底应该执行那个函数。
 
-### 第二条：在类的头文件中尽量少引入其他头文件
+### 第2条：在类的头文件中尽量少引入其他头文件
 
 因为实现属性、实例变量或者遵循协议会需要引入头文件，这样会增加编译时间，增加彼此的依赖程度。过大的依赖会增加维护的麻烦。
 
@@ -37,7 +37,7 @@ objective-C 使用“消息结构”而非“函数调用”。
 
 循环引用：在各自头文件中引入对方的头文件，并且A中包含B的一个对象，就会出现错误（Unknown type name 'B'）。
 
-### 第三条：多用字面量语法，少用与之等价的方法
+### 第3条：多用字面量语法，少用与之等价的方法
 
 #### 字面数值
 
@@ -99,7 +99,7 @@ NSDictionary *dic1 = [NSDictionary dictionaryWithObjectsAndKeys:@"Matt", @"first
 需要可变的话加一个mutableCopy
 
 
-### 第四条：多用类型常量，少用#define预处理指令
+### 第4条：多用类型常量，少用#define预处理指令
 
 * 不要用预处理指令定义常量。这样定义出来的常量不含类型信息，编译器只是会在编译前据此执行查看与替换操作。即使有人重新定义了常量值，编译器也不会产生警告信息（其实会有警告），这将导致应用程序中的常量值不一致。
 * 在实现文件中使用static const来定义“只在编译单元内可见的常量”。由于此类常量不会在全局符号表中，所以无须为其名称加前缀或加一个字母k。
@@ -357,7 +357,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 ## 块与大中枢派发
 ## 系统框架
 
-### 多用块枚举，少用for循环
+### 第48条：多用块枚举，少用for循环
 
 #### 为什么不用for循环
 
@@ -416,7 +416,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 
 缺点是无法直接拿到对象下标
 
-##### 数组
+**数组**
 
 ```
 - (void)enumerateArrByForIn:(NSArray *)array
@@ -427,7 +427,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 }
 ```
 
-##### 字典
+**字典**
 
 ```
 - (void)enumerateDictionaryByForIn:(NSDictionary *)dictionary
@@ -438,7 +438,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 }
 ```
 
-#### NSSet
+**NSSet**
 
 ```
 - (void)enumerateSetByForIn:(NSSet *)set
@@ -449,7 +449,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 }
 ```
 
-#### 块遍历
+**块遍历**
 
 ```
     /*
@@ -460,7 +460,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
      */
 ```
 
-##### 数组
+**数组**
 
 ```
 - (void)enumerateArrUsingBlock:(NSArray *)array
@@ -479,7 +479,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 }
 ```
 
-##### 字典
+**字典**
 
 ```
 - (void)enumerateDictionaryUsingBlock:(NSDictionary *)dictionary
@@ -498,7 +498,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 }
 ```
 
-#### NSSet
+**NSSet**
 
 ```
 - (void)enumerateSetUsingBlock:(NSSet *)set
