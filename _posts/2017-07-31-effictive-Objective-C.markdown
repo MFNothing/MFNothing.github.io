@@ -367,7 +367,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 
 #### 使用NSEnumerator来遍历 Objective-C 1.0
 
-##### 数组
+**数组**
 
 ```
 - (void)enumerateArr:(NSArray *)array
@@ -382,7 +382,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 }
 ```
 
-##### 字典
+**字典**
 
 ```
 - (void)enumerateDictionary:(NSDictionary *)dictionary
@@ -397,7 +397,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 }
 ```
 
-#### NSSet
+**NSSet**
 
 ```
 - (void)enumerateSet:(NSSet *)set
