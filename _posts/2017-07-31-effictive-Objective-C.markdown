@@ -630,6 +630,13 @@ NSCache 的优势 :
         NSLog(@"***************");
     }
 }
+
+#pragma mark - NSCacheDelegate
+- (void)cache:(NSCache *)cache willEvictObject:(id)obj
+{
+    CacheObject *object = (CacheObject *)obj;
+    NSLog(@"willEvictObject obj = %@ num = %d",object, object.num);
+}
 ```
 
 打印
