@@ -517,7 +517,131 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
     }];
 }
 ```
-### 构建缓存时选用 NSCahche 而非 NSDictionary
+### 第49条：对自定义其内存管理语义的collection使用无缝桥接
+
+首先先了解Objective-C的系统库中属于collection类的，有数组、字典、set等。
+
+Foundation框架定义了这些collection以及其他各种collection所对应的Objective-C类
+
+与之对应的CoreFoundation框架也定义了一套C语言的API，用于操作这些collection以及其他各种collection的数据结构。
+
+NSArray （Foundation框架中表示Objective-C类）
+
+CFArray （Corefoundation框架中等价物）
+
+无缝桥接（toll—free bridging）是一个可让两个类型平滑转换的技术
+
+```
+    NSArray *array = @[@1, @2, @3, @4];
+    CFArrayRef cfArray = (__bridge_retained CFArrayRef) array;
+    NSLog(@"size = %li", CFArrayGetCount(cfArray));
+    NSArray *transferArray = (__bridge_transfer NSArray*)cfArray;
+    NSLog(@"transfer size = %lu", (unsigned long)transferArray.count);
+```
+
+__bridge ：ARC仍然具备这个Objective-C对象的所有权
+
+__bridge_retained：交出对象的所有权，上面代码的cfArray，在被用完之后需要加上CFRelease(cfArray)以释放其内存。(__bridge_retained \<CF type>)
+
+__bridge_transfe：将collection数据结构转换为Objective-C对象，并使得对象获得所有权。所以如果前面用__bridge会报错，因为用这个cfArray不拥有对象所有权，也交不出来。 (__bridge_transfer \<Objective-C type>)
+
+在自定义不同语义的NSMutableDictionary，对CFDictionaryCreateMutable 的了解
+
+```
+CFMutableDictionaryRef CFDictionaryCreateMutable(CFAllocatorRef allocator, CFIndex capacity, const CFDictionaryKeyCallBacks *keyCallBacks, const CFDictionaryValueCallBacks *valueCallBacks);
+
+/*
+	CFAllocatorRef allocator 表示要使用的内存分配器，通常传入NULL，表示采用默认的分配器
+	CFIndex capacity 字典初始化大小，它并不会限制字典的最大容量。跟 NSMutableDictionary 的 + (instancetype)dictionaryWithCapacity:(NSUInteger)numItems; 差不多
+	const CFDictionaryKeyCallBacks *keyCallBacks 这个默认有两个const 可以传入 （ kCFTypeDictionaryKeyCallBacks 和 kCFCopyStringDictionaryKeyCallBacks ）
+		* kCFTypeDictionaryKeyCallBacks 表示键设置的时候需要是CFTypes
+		* kCFCopyStringDictionaryKeyCallBacks 表示键设置时候需要是CFStrings并且可以被拷贝
+	const CFDictionaryValueCallBacks *valueCallBacks 这里也有一个const 可以传入 kCFTypeDictionaryValueCallBacks
+		* kCFTypeDictionaryValueCallBacks 表示值设置的时候需要是CFTypes
+*/
+
+/*
+CFDictionaryKeyCallBacks 结构体
+typedef struct {
+    CFIndex				version;
+    CFDictionaryRetainCallBack		retain;
+    CFDictionaryReleaseCallBack		release;
+    CFDictionaryCopyDescriptionCallBack	copyDescription;
+    CFDictionaryEqualCallBack		equal;
+    CFDictionaryHashCallBack		hash;
+} CFDictionaryKeyCallBacks;
+CFDictionaryValueCallBacks 结构体
+typedef struct {
+    CFIndex				version;
+    CFDictionaryRetainCallBack		retain;
+    CFDictionaryReleaseCallBack		release;
+    CFDictionaryCopyDescriptionCallBack	copyDescription;
+    CFDictionaryEqualCallBack		equal;
+} CFDictionaryValueCallBacks;
+
+version 参数目前应设为0。可能会修改此结构体，预留该值以表示版本号。
+
+typedef const void *	(*CFDictionaryRetainCallBack)(CFAllocatorRef allocator, const void *value);
+
+第一个参数参考上面，第二个参数表示传入的键或值，返回类型const void * 说明上面应该传一个函数指针。这些都可以自定义的。
+
+typedef void		(*CFDictionaryReleaseCallBack)(CFAllocatorRef allocator, const void *value);
+
+跟前面类似，表示release的时候回调的函数。
+
+typedef CFStringRef	(*CFDictionaryCopyDescriptionCallBack)(const void *value);
+
+typedef Boolean		(*CFDictionaryEqualCallBack)(const void *value1, const void *value2);
+
+typedef CFHashCode	(*CFDictionaryHashCallBack)(const void *value);
+
+*/
+```
+
+自定义一个其他语义的NSMutableDictionary
+
+```
+const void* MINRetainCallBack(CFAllocatorRef allocator, const void *value)
+{
+    return CFRetain(value);
+//    return value;
+}
+
+void MINReleaseCallBack(CFAllocatorRef allocator, const void *value)
+{
+    CFRelease(value);
+}
+
+- (void)testCustomDictionary
+{
+    CFDictionaryKeyCallBacks keyCallBack = {0, MINRetainCallBack, MINReleaseCallBack, NULL, CFEqual, CFHash};
+    CFDictionaryValueCallBacks valueCallBack = {0, MINRetainCallBack, MINReleaseCallBack, NULL, CFEqual};
+    CFMutableDictionaryRef cfDictionary = CFDictionaryCreateMutable(kCFAllocatorDefault, 1, &keyCallBack, &valueCallBack);
+//    CFStringRef cfString = CFSTR("key");
+    const void *cKeyArr[] = {CFSTR("key1"), CFSTR("key2")};
+    const void *cValueArr[] = {CFSTR("value1"), CFSTR("value2")};
+    CFArrayRef cfKeyArray = CFArrayCreate(0, cKeyArr, (CFIndex)2, NULL);
+    CFArrayRef cfValueArray = CFArrayCreate(0, cValueArr, (CFIndex)2, NULL);
+    CFDictionaryAddValue(cfDictionary, cfKeyArray, cfValueArray);
+    NSMutableDictionary *dictionary = (__bridge_transfer NSMutableDictionary *)cfDictionary; // 一般情况下我们的key值都是string，现在可以设置对象了
+    NSLog(@"%@", dictionary);
+}
+```
+
+这里改变了键值所对应的retain回调函数对key的处理方式，不是拷贝key了而是保留key
+
+设置回调的时候，copyDescription 取值为NULL， 因为采用默认的实现就很好。而equal 与 hash 回调函数分别设置为  CFEqual 和 CFHash，因为这二者采用的方式与NSMutableDictionary 的默认实现相同。CFEqual 最终会调用 NSObject 的 “isEqual:”方法，而CFHash 则会调用 hash 方法。 
+
+键值所对应的的retain 和 release 回调函数指针分别指向 MINRetainCallBack 和 MINReleaseCallBack 函数。一般我们创建的 NSMutableDictionary 加入键和值是，字典会自动“拷贝”键并保留“值”。这里我们将键的方式改成了“保留”键。可以做到，当键值不能被拷贝的时候不会报错。
+
+开发者可以通过这样的方式创建一个自定义语义的Objective-C类对象。
+
+**要点**
+
+* 通过无缝桥接技术，可以在Foundation框架中的Objective-C对象与CoreFoundation框架中的C语言数据结构之间来为转换
+* 在CoreFoundation层面创建collection时，可以指定许多回调函数，这些函数表示此collection应如何处理其元素。然后，可运用无缝桥接技术，将其转换成具备特殊内存管理语义的Objective-C collection。
+
+### 第50条：构建缓存时选用 NSCahche 而非 NSDictionary
 
 NSCache 的优势 :
 
@@ -680,7 +804,35 @@ NSCache 的优势 :
 2018-04-22 15:59:53.136602+0800 enumerateTest[6407:219822] obj = <CacheObject: 0x60000000c780> num = 3 count = 1  discardContentIfPossible
 ```
 
+### 第51条：精简initialize 与 load 的实现方法
 
+有时候，类必须先执行某些初始化操作，然后才能正常使用。在 Objective-C 中，对大多数类都继承自 NSObject 这个根类，而该类有两个方法，可以用来实现这种初始化操作
+
+**load** 方法，对于加入运行期系统中的每个类（class）以及分类（category）来说，必定会调用这个方法，而且仅调用一次。当包含类或分类的程序库载入系统时，就会执行此方法。
+
+* 在 iOS 应用程序中，这个时候通常指的是应用启动的时候
+* 在 MAC OS X 应用程序更自由一点，它们可以使用“动态加载”之类的特性，等应用程序启动好之后再去加载程序库。
+
+特点：
+
+1. 调用顺序，先调用超类的，再调用子类，如果类中还有分类，会先调类里面的，再调分类的，分类调用顺序跟超类和子类无关。
+2. 调用时会阻塞线程，所以复杂的操作不要在这里进行。
+3. 不会覆盖超类的实现，各自执行自己的实现，如果没实现不执行。
+
+尽量不使用这个方法
+
+**initialize** 方法，程序会在首次使用该类之前调用，且只调用一次。它是由运行期系统调用的，绝不应该通过代码直接调用。
+
+initialize 方法只应该用来设置内部数据。不要调用其他方法，即使是自己类中的方法。
+
+应用地方，无法再编译期设定的全局变量的初始化，比如初始化一个全局的可变数组。整数可以编译期定义，可变数组不行，因为它是一个Objective-C 对象，所以创建实例之前必须先激活运行期系统。
+
+特点：
+
+1. 从运行期系统完整度上来讲，此时可以安全使用并调用任意类中的任意方法。
+2. 运行期系统也能确保 initialize 方法一定会在“线程安全的环境”中执行，就是说只有执行的那个线程可以操作类或类实例，其他线程都要先阻塞，等待它执行完成。
+3. 如果超类实现了 initialize 方法，子类未实现，会执行父类的方法。
+4. 调用顺序也是先父类再子类
 
 
 
