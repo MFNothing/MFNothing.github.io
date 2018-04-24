@@ -249,8 +249,7 @@ readonly 属性拥有getter方法
 
 * 在对象内部读取数据时，应该直接通过实例变量来读，而写入数据时，则应通过属性来写。（在setter方法中通过属性写入/获取中通过属性读取会导致死循环，因为属性先会调用setter方法/getter方法，然后setter方法/getter方法中有属性又会调用setter方法/getter方法从而导致死循环。）
 * 在初始化方法(setter和getter方法)及dealloc方法中，总是应该直接通过实例变量读写数据
-* 有时会使用惰性初始化（重写getter方法，在getter方法中初始化实例变量）技术配置某份数据，这种情况下，需要通过属性来读取数据。否则实例
-* 变量永远不会初始化。
+* 有时会使用惰性初始化（重写getter方法，在getter方法中初始化实例变量）技术配置某份数据，这种情况下，需要通过属性来读取数据。否则实例变量永远不会初始化。
 
 ### 第8条：理解“对象等同性”这一概念
 
@@ -355,6 +354,86 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 
 ## 内存管理
 ## 块与大中枢派发
+
+### 第37条：理解“块”这一概念
+
+块与函数类似，只不过是直接定义在另一个函数里的，和定义它的那个函数共享同一个范围内的东西。
+
+```
+- (void)simpleBlock {
+    ^{
+        NSLog(@"unsed block");
+    }; // 这个只是声明这个block，但是并未使用它，它可以访问simpleBlock这个函数内的和可以访问到的所有变量或方法
+}
+```
+
+块从上面的例子看出，它就是一个值，而且自有其相关类型。与 int、 float  或 Objective-C 对象一样，也可以把块赋值给变量，然后像使用其他变量那样去使用它。
+
+块类型的语法结构如下：
+
+```
+return_type (^block_name)(parameters)
+```
+
+几个简单的块及使用
+
+```
+- (void)usingBlock {
+    void (^printBlock) (void) = ^{
+        NSLog(@"没有参数也没有返回值的block");
+    };
+    printBlock();
+    int (^addNum)(int a, int b) = ^(int a, int b){
+        return a + b;
+    };
+    int num = addNum(1, 2);
+    NSLog(@"%d", num);
+}
+```
+
+为块所捕获的变量，是不可以在块里修改的，如果想要在块内修改变量的值，可以加上 __block。
+
+```
+- (void)usingBlockChangeValue {
+    __block int a = 0;
+    __block NSMutableArray *array = [NSMutableArray array];
+    void (^changeValueBlock)(void) = ^{
+        a = 10;
+        [array addObject: [NSNumber numberWithInt: a]];
+    };
+    changeValueBlock();
+    NSLog(@"%d %@", a, array);
+}
+```
+如果块所捕获的变量是对象类型，那么就会自动保留它。
+
+块本身可视为对象，有引用计数。当最后一个指向块的引用移走后，块就回收了。
+
+如果将块定义在Objective-C类的实例方法中，那么除了可以访问类的所有变量之外，还可以使用self变量。块总能修改实例变量，所以在声明无须加__block。
+
+如果通过读取或写入操作捕获了实例变量，那么也会自动把self变量一并捕获了。直接访问实例变量和通过self来访问是等效的。(注意这里的self访问是下面的方式，与属性访问实例变量的方式不一样，不会调用属性的 setter 或 getter 方法)
+
+```
+- (void)visitAnInstanceVariable
+{
+    void (^visitAnInstanceVariableBlock)(void) = ^{
+        self->_anInstanceVariable = @"anInstanceVariable"; 
+//        _anInstanceVariable = @"anInstanceVariable"; // 与上面等价
+    };
+    visitAnInstanceVariableBlock();
+    NSLog(@"%@", self.anInstanceVariable); // 这里才调用了setter 和 getter 方法
+}
+```
+
+之所以要捕获self变量，原因正因如此，在块中会通过这个方式去访问实例变量，即使没有加 self->。这里也会产生一个问题，就是如果 self 保留了这个块就会出现“保留环”（一般我们说的循环引用）。
+
+#### 块的内部结构
+
+内部结构
+
+![](/img/in-mpost/Effective-Objective-C/块对象的内存布局.png)
+
+
 ## 系统框架
 
 ### 第48条：多用块枚举，少用for循环
@@ -819,7 +898,7 @@ NSCache 的优势 :
 2. 调用时会阻塞线程，所以复杂的操作不要在这里进行。
 3. 不会覆盖超类的实现，各自执行自己的实现，如果没实现不执行。
 
-尽量不使用这个方法
+尽量不使用这个方法,这个方法只要有self，就先去调用initialize方法。
 
 **initialize** 方法，程序会在首次使用该类之前调用，且只调用一次。它是由运行期系统调用的，绝不应该通过代码直接调用。
 
