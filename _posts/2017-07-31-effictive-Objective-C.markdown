@@ -208,6 +208,24 @@ typedef NS_OPTIONS(NSUInteger, EOCPermittedDirection){
 
 在默认情况下，由编译器所合成的方法会通过锁定机制确保其原子性，但是会消耗性能，而且在大量读取操作时也不能保证其原子性，所以一般都用nonatomic而不是atomic（即一个线程不停读取属性值，而另一个线程在同时改这个值）
 
+加锁类似于这样
+
+```
+- (NSString *)someString
+{
+    @synchronized(self) {
+        return _minString;
+    }
+}
+
+- (void)setSomeString:(NSString *)someString
+{
+    @synchronized(self){
+        _minString = [someString copy];
+    }
+}
+```
+
 **读写权限**
 
 readwrite 属性拥有getter和setter方法
@@ -265,26 +283,26 @@ readonly 属性拥有getter方法
 
 特点
 
-* 是唯一能声明实例变量的分类
+* 是唯一能声明实例变量的分类，不是属性
 * 没有特定的实现文件，其中声明的方法都应该定义在类的主实现文件里
 * 没有分类名字
 
 "class-continuation 分类" 就是.m 中写的
 	
-	// 这个部分就是 class-continuation
-	@interface MINClass（）
-	{// 块，实例变量声明的地方
+```
+// 这个部分就是 class-continuation
+@interface MINClass（）
+{// 块，实例变量声明的地方
 	
-	}
-	// 
-	@end
-	// 上面的部分是 class-continuation,下面是具体的实现
-	@implementation MINClass
-	{// 括号里面的表示实现块，这里也可以声明实例变量,属性不能在块中声明
-		NSString *justString;
-	}
-	// 
-	@end
+}
+@end
+// 上面的部分是 class-continuation,下面是具体的实现
+@implementation MINClass
+{// 括号里面的表示实现块，这里也可以声明实例变量,属性不能在块中声明
+	NSString *justString;
+}
+@end
+```
 	
 使用的场景
 
@@ -302,8 +320,12 @@ readonly 属性拥有getter方法
 
 ```
 #import <Foundation/Foundation.h>
-#include "SomeCppClass.h" // C++类
-@interface EOCClass : NSObject{
+
+#include "SomeCppClass.h" 
+// C++类
+
+@interface EOCClass : NSObject
+{
 @private
 	SomeCppClass _cppClass;
 }
@@ -320,13 +342,20 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 
 ```
 // EOCClass.h
+
 #import <Foundation/Foundation.h>
+
 @interface EOCClass : NSObject
+
 @end
+
 //EOCClass.mm
 #import "EOCClass.h"
+
 #include "SomeCppClass.h"
-@interface EOCClass (){
+
+@interface EOCClass ()
+{
 	SomeCppClass _cppClass;
 }
 @end
@@ -574,6 +603,168 @@ typedef void (^MINAccountStoreRequestAccessCompletionHandler)(BOOL success, NSEr
 ```
 
 ### 第39条：用 handler 块降低代码分散程度
+
+在创建对象时，可以使用内联的 handler 块将相关业务逻辑一并声明。
+
+在有多个实例需要监控时，如果采用委托模式，那么经常需要根据传入的对象来切换（增加代码阅读难度），而改用 handler 块来实现，则可直接将块与相关对象放在一起。
+
+使用代理的方式
+
+```
+// 类
+
+#import <Foundation/Foundation.h>
+
+@class MINNetWorkFetcherUsingDelegate;
+
+@protocol MINNetWorkFetcherDelegate <NSObject>
+- (void)networkFetcher:(MINNetWorkFetcherUsingDelegate *)networkFetcher
+     didFinishWithData:(NSData *)data
+                 error:(NSError *)error;
+@end
+
+@interface MINNetWorkFetcherUsingDelegate : NSObject
+@property (nonatomic, weak) id<MINNetWorkFetcherDelegate> delegate;
+- (instancetype)initWithUrl:(NSURL *)url;
+- (void)start;
+@end
+
+// 使用
+
+- (void)fetchFooData
+{
+    NSURL *url = [NSURL URLWithString: @"http://url.com/foo.data"];
+    _fooFetcher = [[MINNetWorkFetcherUsingDelegate alloc] initWithUrl: url];
+    _fooFetcher.delegate = self;
+    [_fooFetcher start];
+}
+
+- (void)fetchBarData
+{
+    NSURL *url = [NSURL URLWithString: @"http://url.com/bar.data"];
+    _barFetcher = [[MINNetWorkFetcherUsingDelegate alloc] initWithUrl: url];
+    _barFetcher.delegate = self;
+    [_barFetcher start];
+}
+
+#pragma mark - MINNetWorkFetcherDelegate
+
+- (void)networkFetcher:(MINNetWorkFetcherUsingDelegate *)networkFetcher didFinishWithData:(NSData *)data error:(NSError *)error
+{
+    if (networkFetcher == _fooFetcher) {
+        
+    }else if (networkFetcher == _barFetcher) {
+        
+    }
+}
+```
+
+使用 handler 的方式
+
+```
+// 类
+
+#import <Foundation/Foundation.h>
+
+typedef void (^MINNetworkFetcherCompletionHandler)(NSData *data, NSError *error);
+
+@interface MINNetworkFetcherUsingBlock : NSObject
+- (instancetype)initWithUrl:(NSURL *)url;
+- (void)startWithCompletionHandler:(MINNetworkFetcherCompletionHandler) handler;
+@end
+
+- (void)fetchFooData
+{
+    NSURL *url = [NSURL URLWithString: @"http://url.com/foo.data"];
+    MINNetworkFetcherUsingBlock *fooFetcher = [[MINNetworkFetcherUsingBlock alloc] initWithUrl: url];
+    [fooFetcher startWithCompletionHandler:^(NSData *data, NSError *error) {
+        if (error) {
+            
+        }else {
+            
+        }
+    }];
+}
+
+- (void)fetchBarData
+{
+    NSURL *url = [NSURL URLWithString: @"http://url.com/bar.data"];
+    MINNetworkFetcherUsingBlock *barFetcher = [[MINNetworkFetcherUsingBlock alloc] initWithUrl: url];
+    [barFetcher startWithCompletionHandler:^(NSData *data, NSError *error) {
+        if (error) {
+            
+        }else {
+            
+        }
+    }];
+}
+```
+
+设计API时如果用到了 handler 块，那么可以增加一个参数，使调用者可通过此参数来决定应该把块安排在哪个队列上执行。
+
+```
+// 这个可以参考通知的方式，默认不传 queue，则在默认线程执行。
+
+- (id <NSObject>)addObserverForName:(nullable NSNotificationName)name
+                             object:(nullable id)obj
+                              queue:(nullable NSOperationQueue *)queue
+                         usingBlock:(void (^)(NSNotification *note))block
+                         
+```
+
+### 第40条：用块引用其所属对象时不要出现保留环（循环引用）
+
+如果块所捕获的对象直接或间接的保留了块本身，那么就得当心保留环的问题。
+
+一定要找个适当的时机解除保留环，而不能把责任推给API调用者。即不要让使用块里面去做操作。
+
+```
+#import <Foundation/Foundation.h>
+
+typedef void (^MINNetworkFetcherCompletionHandler)(NSData *data, NSError *error);
+
+@interface MINNetworkFetcherUsingBlock : NSObject
+@property (nonatomic, strong, readonly) NSURL *url;
+- (instancetype)initWithUrl:(NSURL *)url;
+- (void)startWithCompletionHandler:(MINNetworkFetcherCompletionHandler) handler;
+@end
+
+#import "MINNetworkFetcherUsingBlock.h"
+
+@interface MINNetworkFetcherUsingBlock ()
+@property (nonatomic, strong, readwrite) NSURL *url;
+@property (nonatomic, copy) MINNetworkFetcherCompletionHandler completionHandler;
+@property (nonatomic, strong) NSData *downloadData;
+@end
+
+@implementation MINNetworkFetcherUsingBlock
+- (instancetype)initWithUrl:(NSURL *)url
+{
+    if (self = [super init]) {
+        _url = url;
+    }
+    return self;
+}
+
+- (void)startWithCompletionHandler:(MINNetworkFetcherCompletionHandler)handler
+{
+    self.completionHandler = handler;
+    // Start the request
+    // Request sets downloadedData property
+    // When request is finished, p_requestCompleted is called
+}
+
+- (void)p_requestCompleted {
+    if (_completionHandler) {
+        _completionHandler(_downloadData, nil);
+    }
+    // 这里将放弃持有block，避免循环引用，最重要的地方
+    self.completionHandler = nil;
+}
+@end
+```
+
+### 第
 
 ## 系统框架
 
