@@ -455,10 +455,12 @@ typedef void (^CopyBlock)(void);
     void (^block)(void) = ^{
         a = 10;
     };
-    NSLog(@"%@", block); // <__NSMallocBlock__: 0x600000249db0>
+    NSLog(@"%@", block); 
+    // <__NSMallocBlock__: 0x600000249db0>
     self.aCopyBlock = block;
     self.aAnotherBlock = block;
-    NSLog(@"%@ %@", self.aCopyBlock, self.aAnotherBlock); // <__NSMallocBlock__: 0x600000249db0> <__NSMallocBlock__: 0x600000249db0>
+    NSLog(@"%@ %@", self.aCopyBlock, self.aAnotherBlock); 
+    // <__NSMallocBlock__: 0x600000249db0> <__NSMallocBlock__: 0x600000249db0>
 }
 ```
 
@@ -478,9 +480,11 @@ NSLog(@"%@", ^{a = 10;}); //  <__NSStackBlock__: 0x7ffeed927a38>
 
 ```
 __block int a = 0;
-NSLog(@"%@", ^{a = 10;}); // <__NSStackBlock__: 0x7ffeef751a70>
+NSLog(@"%@", ^{a = 10;}); 
+// <__NSStackBlock__: 0x7ffeef751a70>
 block = ^{NSLog(@"%d", a);};
-NSLog(@"%@", block); // <__NSMallocBlock__: 0x6000000559f0>
+NSLog(@"%@", block); 
+// <__NSMallocBlock__: 0x6000000559f0>
 ```
 
 这个例子能看出那个拷贝操作
@@ -494,10 +498,12 @@ typedef void (^CopyBlock)(void);
     __block int a = 0;
     void (^block)(void);
     block = ^{NSLog(@"%d", a);};
-    NSLog(@"%@", block);// <__NSMallocBlock__: 0x60c000050e60>
+    NSLog(@"%@", block);
+    // <__NSMallocBlock__: 0x60c000050e60>
     self.aCopyBlock = block;
     self.aAnotherBlock = [block copy];
-    NSLog(@"%@ %@", self.aCopyBlock, self.aAnotherBlock); // <__NSMallocBlock__: 0x60c000050e60> <__NSMallocBlock__: 0x60c000050e60>
+    NSLog(@"%@ %@", self.aCopyBlock, self.aAnotherBlock); 
+    // <__NSMallocBlock__: 0x60c000050e60> <__NSMallocBlock__: 0x60c000050e60>
 }
 ```
 
@@ -518,10 +524,12 @@ typedef void (^CopyBlock)(void);
     block = ^{
         NSLog(@"__NSGlobalBlock__");
     };
-    NSLog(@"%@", block); // <__NSGlobalBlock__: 0x10b4b1220>
+    NSLog(@"%@", block); 
+    // <__NSGlobalBlock__: 0x10b4b1220>
     self.aCopyBlock = block;
     self.aAnotherBlock = [block copy];
-    NSLog(@"%@ %@", self.aCopyBlock, self.aAnotherBlock); // <__NSGlobalBlock__: 0x10b4b1220> <__NSGlobalBlock__: 0x10b4b1220>
+    NSLog(@"%@ %@", self.aCopyBlock, self.aAnotherBlock); 
+    // <__NSGlobalBlock__: 0x10b4b1220> <__NSGlobalBlock__: 0x10b4b1220>
 }
 ```
 虽然block类型不一样，但是地址是相同的。
