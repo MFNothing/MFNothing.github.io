@@ -433,6 +433,137 @@ return_type (^block_name)(parameters)
 
 ![](/img/in-mpost/Effective-Objective-C/块对象的内存布局.png)
 
+首个变量是指向Class 对象的指针，该指针叫做 isa。
+
+最重要的 invoke 变量，这个函数指针，指向块的实现代码。函数原型至少接受一个void *型的参数，此参数代表块。刚才说过块其实是一种代替函数指针的语法结构。
+
+descriptor 变量是指向结构提的指针，每个块里都包含此结构体，其中声明了块对象的总体大小，还声明了 copy 和 dispose 这两个辅助函数对应的函数指针。辅助函数在拷贝及丢弃块对象时运行，前者要保留捕获的对象，后者则将捕获对象释放。
+
+块会把它捕获的所有变量都拷贝一份，这些拷贝放在 descriptor 变量后面，注意这里拷贝的并不是对象本身，而是指向这些对象的指针变量。invoke 函数为何需要把块对象作为参数传进来，原因就在于，执行块是，要从内存中吧这些捕获到的变量读出来。
+
+#### 全局块、栈块及堆块
+
+定义块的时候，其所占的内存区域是分配在栈中的。这就是说，块只在定义它的那个范围有效（函数或类中）。所以我们设置属性的时候，对于block来说设置为copy，进行copy操作后会将块拷贝到堆上面，这样就可以在定义它的范围之外使用了。而且，一旦复制到堆上，块就成了带引用计数的对象了。后续的复制操作都不会真的执行复制，只是递增对象的引用计数。
+
+```
+typedef void (^CopyBlock)(void);
+@property (nonatomic, copy) CopyBlock aCopyBlock;
+@property (nonatomic, copy) CopyBlock aAnotherBlock;
+
+- (void)copyBlock{
+    __block int a = 0;
+    void (^block)(void) = ^{
+        a = 10;
+    };
+    NSLog(@"%@", block); // <__NSMallocBlock__: 0x600000249db0>
+    self.aCopyBlock = block;
+    self.aAnotherBlock = block;
+    NSLog(@"%@ %@", self.aCopyBlock, self.aAnotherBlock); // <__NSMallocBlock__: 0x600000249db0> <__NSMallocBlock__: 0x600000249db0>
+}
+```
+
+**栈块**
+
+使用定义范围内的变量的block，但是赋值给block变量之后会变成 \<__NSMallocBlock__: 0x60c00024eee0>
+
+```
+int a = 0;
+NSLog(@"%@", ^{NSLog(@"%d", a);}); //  <__NSStackBlock__: 0x7ffeeede9a60>
+NSLog(@"%@", ^{a = 10;}); //  <__NSStackBlock__: 0x7ffeed927a38>
+```
+
+**堆块**
+
+栈块赋值给block变量后，会变成堆块(感觉自动进行一次拷贝操作)。
+
+```
+__block int a = 0;
+NSLog(@"%@", ^{a = 10;}); // <__NSStackBlock__: 0x7ffeef751a70>
+block = ^{NSLog(@"%d", a);};
+NSLog(@"%@", block); // <__NSMallocBlock__: 0x6000000559f0>
+```
+
+这个例子能看出那个拷贝操作
+
+```
+typedef void (^CopyBlock)(void);
+@property (nonatomic, copy) CopyBlock aCopyBlock;
+@property (nonatomic, copy) CopyBlock aAnotherBlock;
+
+- (void)copyBlock{
+    __block int a = 0;
+    void (^block)(void);
+    block = ^{NSLog(@"%d", a);};
+    NSLog(@"%@", block);// <__NSMallocBlock__: 0x60c000050e60>
+    self.aCopyBlock = block;
+    self.aAnotherBlock = [block copy];
+    NSLog(@"%@ %@", self.aCopyBlock, self.aAnotherBlock); // <__NSMallocBlock__: 0x60c000050e60> <__NSMallocBlock__: 0x60c000050e60>
+}
+```
+
+**全局块**
+
+全局块就是没有捕获状态的块（比如可访问范围内的变量）。块所使用的整个内存区域，在编译期已经完全确定了，所以全局块可以声明在全局内存里，而不需要每次用到的时候于栈中创建。
+
+全局块的拷贝操作是空操作，因为全局块不会被系统回收。相当于单例。
+
+```
+typedef void (^CopyBlock)(void);
+@property (nonatomic, copy) CopyBlock aCopyBlock;
+@property (nonatomic, copy) CopyBlock aAnotherBlock;
+
+- (void)copyBlock{
+    __block int a = 0;
+    void (^block)(void);
+    block = ^{
+        NSLog(@"__NSGlobalBlock__");
+    };
+    NSLog(@"%@", block); // <__NSGlobalBlock__: 0x10b4b1220>
+    self.aCopyBlock = block;
+    self.aAnotherBlock = [block copy];
+    NSLog(@"%@ %@", self.aCopyBlock, self.aAnotherBlock); // <__NSGlobalBlock__: 0x10b4b1220> <__NSGlobalBlock__: 0x10b4b1220>
+}
+```
+虽然block类型不一样，但是地址是相同的。
+
+
+### 第39条：为常用的块类型创建 typedef
+
+目的是为了增加代码可读性。
+
+```
+typedef void (^CopyBlock)(void);
+@property (nonatomic, copy) CopyBlock aCopyBlock;
+
+- (void)useTypeDef
+{
+    CopyBlock block = ^{
+        
+    };
+}
+
+- (void)useCopyBlock:(CopyBlock)copyBlock
+{
+    if (copyBlock) {
+        copyBlock();
+    }
+}
+```
+
+并且当你后面需要修改这个block的参数时候，直接修改这里，然后编译，可以找到所有你用过的地方（因为编译会报错），然后依次替换就好了。
+
+如果用之前的方式，你可能找不全你想要改的地方，代码过于复杂的话。
+
+如果有好几个类都要执行相似但各有区别的异步任务，而这几个类又不能放入同一个继承体系的时候，那么，每一个类就应该有自己的块类型，即使块中的参数类型都相同。这样可以保证如果某个类有新的需求需要改参数的时候，不用去动其他类的块。
+
+例如：
+
+```
+typedef void (^MINAccountStoreSaveCompletionHandler)(BOOL success, NSError *error);
+typedef void (^MINAccountStoreRequestAccessCompletionHandler)(BOOL success, NSError *error);
+```
+
+### 第39条：用 handler 块降低代码分散程度
 
 ## 系统框架
 
