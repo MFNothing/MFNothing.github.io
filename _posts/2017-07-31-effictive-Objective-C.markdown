@@ -764,7 +764,89 @@ typedef void (^MINNetworkFetcherCompletionHandler)(NSData *data, NSError *error)
 @end
 ```
 
-### 第
+### 第41条：多用派发队列，少用同步锁
+
+这里先简单了解一下队列的相关知识，如果了解，可以跳过这段。
+
+GCD(Grand central Dispacth)
+
+调控线程，是一个block
+
+将任务(操作)放入队列
+
+任务：
+
+* 同步(sync),阻塞当前线程并等待block中的任务执行完毕(即等我执行完，你再执行)，在执行（这个只是阻塞当前线程，所以如果是并行队列，可能多个任务会在多个线程中执行，排在同一个线程下的任务才会被阻塞）
+* 异步(async),不阻塞当前线程，当前线程继续进行(不用等我，你们走你们的)
+
+队列(存放任务的地方)：
+
+* 串行队列 : 从队列中依次取出，根据取出顺序依次执行(dispatch_get_main_queue)，所以这个不会去管任务是同步还是异步的，要等这个任务执行完了，才执行下一个。
+* 并行队列 : 从队列中依次取出，放入其他线程一起执行(dispatch_get_global_queue)
+
+队列的创建方式：
+
+* dispatch_queue_t queue = dispatch_queue_create("name", DISPATCH_QUEUE_SERIAL); // 串行
+* dispatch_queue_t queue = dispatch_queue_create("name", DISPATCH_QUEUE_CONCURRENT); // 并行
+* dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0);
+* dispatch_get_main_queue();
+
+主线程异步执行
+
+```
+dispatch_async(dispatch_get_main_queue(), ^{...});
+```
+
+主线程同步执行
+
+```
+dispatch_sync(dispathc_get_main_queue(), ^{...});
+```
+
+栅拦块，必须单独执行，不能与其他块并行，并行队列会等所有块执行完后才会执行这个块。(注意这里queue的)
+
+```
+* void dispatch_barrier_async(dispatch_queue_t queue, dispatch_block_t block);
+* void dispatch_barrier_sync(dispatch_queue_t queue, DISPATCH_NOESCAPE dispatch_block_t block);
+```
+
+共同点：
+
+1. 等待在它前面插入队列的任务先执行完
+2. 等待他们自己的任务执行完再执行后面的任务
+
+不同点：
+
+1. dispatch_barrier_sync将自己的任务插入到队列的时候，需要等待自己的任务结束之后才会继续插入被写在它后面的任务，然后执行它们
+2. dispatch_barrier_async将自己的任务插入到队列之后，不会等待自己的任务结束，它会继续把后面的任务插入到队列，然后等待自己的任务结束后才执行后面任务。
+
+```
+- (void)createBarrierQueue
+{
+    dispatch_queue_t globalQueue = dispatch_queue_create( "concurrent_queue", DISPATCH_QUEUE_CONCURRENT);
+    //dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    for (int i = 0; i < 10; i++) {
+        dispatch_sync( globalQueue, ^{
+            NSLog(@"*****%d", i);
+        });
+    }
+    dispatch_barrier_sync(globalQueue, ^{
+        NSLog(@"barrier_queue");
+    }); // 这个会等到前面执行完再去把后面的任务块加入队列，所以 11111会在后面才打印
+//    dispatch_barrier_async(globalQueue, ^{
+//        NSLog(@"barrier_queue");
+//    }); // 这个不会等到前面执行完再去把后面的任务块加入队列，所以 11111会在前面就打印
+    NSLog(@"11111");
+    for (int i = 0; i < 10; i++) {
+        dispatch_sync( globalQueue, ^{
+            NSLog(@"------%d", i);
+        });
+    }
+}
+```
+
+
+
 
 ## 系统框架
 
