@@ -768,7 +768,7 @@ typedef void (^MINNetworkFetcherCompletionHandler)(NSData *data, NSError *error)
 
 这里先简单了解一下队列的相关知识，如果了解，可以跳过这段。
 
-GCD(Grand central Dispacth)
+**GCD(Grand central Dispacth)**
 
 调控线程，是一个block
 
@@ -803,7 +803,7 @@ dispatch_async(dispatch_get_main_queue(), ^{...});
 dispatch_sync(dispathc_get_main_queue(), ^{...});
 ```
 
-栅拦块，必须单独执行，不能与其他块并行，并行队列会等所有块执行完后才会执行这个块。(注意这里queue的)
+**栅拦块**，必须单独执行，不能与其他块并行，并行队列会等所有块执行完后才会执行这个块。(注意这里queue的)
 
 ```
 * void dispatch_barrier_async(dispatch_queue_t queue, dispatch_block_t block);
@@ -845,6 +845,278 @@ dispatch_sync(dispathc_get_main_queue(), ^{...});
 }
 ```
 
+**要点**
+
+1. 使用GCD来表述同步语义，这种做法要比使用@synchronized块或NSLock对象更简单。
+2. 将同步和异步派发结合起来，可以实现与普通加锁机制一样的同步行为，而这么做不会阻塞异步派发的线程。
+3. 使用同步队列及栅拦块，可以令同步行为更加高效。
+
+### 第42条：多用 GCD，少用 performSelector 系列方法
+
+当通过下面方式去使用 performSelector 时，会发生警告
+
+* PerformSelector may cause a leak because its selector is unknown
+
+编译器由于不知道方法名是否有返回值，所以就没办法运用ARC的内存管理规则来判定返回值是不是应该释放。鉴于此，ARC采取了比较谨慎的做法，就是不添加释放操作。然而这么做可能会导致内存泄露，因为方法在返回对象时可能已经将其保留了。（一般返回对象的时候会对它进行一个Autorelease操作，当没有调用它时会自动释放，但是这里就没有可能就不会去做这个操作了）
+
+```
+- (void)createPerformSelectorWithIndex:(NSInteger)index
+{
+    SEL selector;
+    if (index == 0) {
+        selector = @selector(newObject);
+    }else if (index == 1) {
+        selector = @selector(copyObject);
+    }else {
+        selector = @selector(logObject);
+    }
+    id ret = [self performSelector: selector];
+}
+```
+
+这个ret对象在前面两个有返回值的情况下，ret 对象应由这段代码来释放。
+
+performSelector系列方法能处理的选择太过于局限，选择的返回类型及发送给方法的参数个数都受到限制。
+
+如果想把任务放到另外一个线程上执行，那么最好不要用performSelector系列方法，而是应该把任务封装到块里，然后用GCD的相关方式来实现。
+
+例如，延后执行某项任务
+
+```
+- (void)delayDoSomeThing
+{
+    // 使用 performSelector
+    [self performSelector: @selector(doSomeThing) withObject: nil afterDelay: 5.0];
+    
+    // 使用 GCD
+    dispatch_time_t time = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC));
+    dispatch_after(time, dispatch_get_main_queue(), ^{
+        [self doSomeThing];
+    });
+}
+```
+
+简单了解一些 NSThread
+
+**NSThread**
+
+```
+--- 初始化方式 ---
+1.动态方法
+- (id)initWithTarget:(id)target selector:(SEL)selector object:(id)argument;  
+
+// 初始化线程  
+NSThread *thread = [[NSThread alloc] initWithTarget:self selector:@selector(run) object:nil];  
+// 设置线程的优先级(0.0 - 1.0，1.0最高级)  
+thread.threadPriority = 1;  
+// 开启线程  
+[thread start];  
+
+/*
+selector ：线程执行的方法，这个selector最多只能接收一个参数
+target ：selector消息发送的对象
+argument : 传给selector的唯一参数，也可以是nil
+*/
+
+2.静态方法
++ (void)detachNewThreadSelector:(SEL)selector toTarget:(id)target withObject:(id)argument; 
+
+[NSThread detachNewThreadSelector:@selector(run) toTarget:self withObject:nil];  
+// 调用完毕后，会马上创建并开启新线程  
+
+3.隐式创建线程的方法
+[self performSelectorInBackground:@selector(run) withObject:nil];
+```
+```
+
+--- 线程操作 ---
+
+1. 获取当前线程
+NSThread *current = [NSThread currentThread]; 
+
+2. 获取主线程
+NSThread *main = [NSThread mainThread];  
+
+3. 暂停当前线程
+// 暂停2s  
+[NSThread sleepForTimeInterval:2];  
+// 或者  
+NSDate *date = [NSDate dateWithTimeInterval:2 sinceDate:[NSDate date]];  
+[NSThread sleepUntilDate:date];  
+```
+```
+--- 线程间的通信 ---
+
+1. 在指定线程上执行操作
+[self performSelector:@selector(run) onThread:thread withObject:nil waitUntilDone:YES];  
+
+2. 在主线程上执行操作
+[self performSelectorOnMainThread:@selector(run) withObject:nil waitUntilDone:YES]; 
+
+3. 在当前线程执行操作
+[self performSelector:@selector(run) withObject:nil];
+```
+
+```
+--- 优缺点 ---
+
+1. 优点：NSThread比其他两种多线程方案较轻量级，更直观地控制线程对象
+
+2. 缺点：需要自己管理线程的生命周期，线程同步。线程同步对数据的加锁会有一定的系统开销
+```
+
+
+### 第43条：掌握 GCD 及操作队列的使用时机
+
+在解决多线程与任务管理问题时，派发队列并非唯一方案。
+
+操作队列（NSOperation）提供了一套高层的 OBjective—C API，能实现纯 GCD 所具备的绝大部分功能，而且还能完成一些更为复杂的操作，那些操作若改用 GCD 来写，则需另外编写代码。
+
+使用 NSOperation 及 NSOperationQueue 的好处
+
+* 取消某个操作。在 NSOperation 对象上调用 cancel 方法，该方法会设置对象内的标志位，用以表示此任务不需执行，不过，已启动的任务无法取消。
+* 指定操作间的依赖关系。一个操作可以依赖其他多个操作。开发者能够指定操作之间的依赖关系，使特定的操作必须在另一个操作顺利执行完毕后方可执行。
+* 可以通过 KVO 监控 NSOperation 对象的属性。通过 isCanclled 属性判断任务是否取消，通过 isFinished 属性来判断任务是否已经完成。
+* 指定操作的优先级。（@property NSOperationQueuePriority queuePriority 这个属性）
+* 重用 NSOperation 对象。可以通过设计类中的方法，达到创建一个可以复用的类，让这里 NSOperation 类可以再代码中多次使用。
+
+简单了解 NSOperation 
+
+**NSOperation/NSOperationQueue**
+
+
+```
+1.概述：
+NSOperation的作用是实现多线程编程。
+NSOperation与NSOperationQueue实现多线程编程的基本步骤为：
+（1）先将一个需要的操作封到NSOperation中。
+（2）将NSOperation添加到NSOperationQueue中。
+（3）系统自动将NSOperationQueue的NSOperation取出。
+（4）NSOperation中封装的操作会被放到一条新线程上执行。
+2.注意：
+NSOperation如同NSObject一样，是个抽象类，所以你必须使用继承于它的子类去封装你需要的操作。
+使用子类有3中：
+（1）NSInvocationOperation
+（2）NSBlockOperation
+（3）自定义继承于NSOperation的子类，实现方法。
+
+```
+**NSInvocationOperation**
+
+```
+ NSInvocationOperation *operation = [[NSInvocationOperation alloc]initWithTarget:self selector:@selector(doSomeThing) object:nil];
+ 
+[operation start];
+// 这里是在主线程中执行
+```
+
+**NSBlockOperation**
+
+```
+NSBlockOperation *operation2 = [NSBlockOperation blockOperationWithBlock:^{
+        NSLog(@"%@", [NSThread currentThread]);
+    }];
+    // 添加额外操作
+    [operation2 addExecutionBlock:^{
+        NSLog(@"%@", [NSThread currentThread]);
+    }];
+    
+    [operation2 start];
+//  只要操作数大于2 ，就会执行异步操作
+/*
+2016-08-12 11:09:55.413 多线程[998:173197] <NSThread: 0x7fe103405b80>{number = 1, name = main}
+2016-08-12 11:09:55.413 多线程[998:173233] <NSThread: 0x7fe1036081e0>{number = 2, name = (null)}
+*/
+// 从第二打印看出，额外操作是在另外一个线程中执行的
+```
+
+**NSOperationQueue**
+
+
+```
+--- 创建方式 ---
+// 创建NSInvocationOperation对象
+    NSInvocationOperation *operation1 = [[NSInvocationOperation alloc] initWithTarget:self selector:@selector(testAction) object:nil];
+    // block方式创建
+    NSBlockOperation *operation2 = [NSBlockOperation blockOperationWithBlock:^{
+        NSLog(@"test2%@", [NSThread currentThread]);
+    }];
+    // 创建NSOperationQueue
+    NSOperationQueue *queue = [[NSOperationQueue alloc] init];
+    // 把操作添加到队列中
+    [queue addOperation:operation1];
+    [queue addOperation:operation2];
+    // 另一种添加到队列方式
+    [queue addOperationWithBlock:^{
+        NSLog(@"test3%@", [NSThread currentThread]);
+    }];
+// 从queue中拿出来的operation都是异步执行的。
+
+// 添加一组操作
+    NSArray *array =[ [NSArray alloc]initWithObjects:operation2,operation1, nil];
+    
+    [queue addOperations:array waitUntilFinished:YES];
+    
+```
+```
+--- 添加依赖关系 ---
+// 这样就可以设置执行先后顺序
+NSOperationQueue *queue = [[NSOperationQueue alloc] init];  
+  
+NSBlockOperation *operation1 = [NSBlockOperation blockOperationWithBlock:^(){  
+    NSLog(@"执行第1次操作，线程：%@", [NSThread currentThread]);  
+}];  
+  
+NSBlockOperation *operation2 = [NSBlockOperation blockOperationWithBlock:^(){  
+    NSLog(@"执行第2次操作，线程：%@", [NSThread currentThread]);  
+}];  
+// operation1依赖于operation2, 所以operation1 会等到 operation2执行了之后才会执行  
+[operation1 addDependency:operation2];  
+  
+[queue addOperation:operation1];  
+[queue addOperation:operation2];  
+```
+
+```
+--- 设置队列并发数 ---
+
+// 每次只能执行一个操作  
+queue.maxConcurrentOperationCount = 1;  
+// 或者这样写  
+[queue setMaxConcurrentOperationCount:1]; 
+// 注意这里并不决定操作执行顺序，执行顺序还是跟operation的优先级和是否准备好有关,相同优先级还是可以依靠先进先出的原则串行的。
+```
+
+```
+--- 等待operation完成 ---
+
+// 这样也可以设定并发顺序
+
+NSBlockOperation *opB = [NSBlockOperation blockOperationWithBlock:^{
+　　　[opA waitUntilFinished]; //opB线程等待直到opA执行结束（正常结束或被取消）
+        [self operate];
+    }];
+// 当然最好还是添加依赖实现
+
+// 阻塞当前线程，等待queue的所有操作执行完毕  
+[queue waitUntilAllOperationsAreFinished];  
+// 使用方法跟上面一样，添加到你想要等待queue在其之前完成的队列当中
+// 跟 GCD 中的栅拦一样，队列前面的先执行，在这行后面添加的操作后执行
+
+
+    NSOperationQueue *queue = [[NSOperationQueue alloc] init];
+    for (int i = 0; i < 10; i++) {
+        NSInvocationOperation *operation = [[NSInvocationOperation alloc] initWithTarget: self selector: @selector(doSomeThing) object: nil];
+        [queue addOperation: operation];
+    }
+    [queue waitUntilAllOperationsAreFinished];
+    for (int i = 0; i < 3; i ++) {
+        NSInvocationOperation *operation = [[NSInvocationOperation alloc] initWithTarget: self selector: @selector(doAnotherThing) object: nil];
+        [queue addOperation: operation];
+    }
+```
+
+### 第44条：通过 Dispatch Group 机制，根据系统资源状况来执行任务
 
 
 
