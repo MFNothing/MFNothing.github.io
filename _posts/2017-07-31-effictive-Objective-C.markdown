@@ -1032,9 +1032,20 @@ NSBlockOperation *operation2 = [NSBlockOperation blockOperationWithBlock:^{
 
 **NSOperationQueue**
 
+```
+// 主队列
+
+NSOperationQueue *queue = [NSOperationQueue mainQueue];
+ 
+// 非主队列
+
+NSOperationQueue *queue = [[NSOperationQueue alloc] init];
+```
+
 
 ```
 --- 创建方式 ---
+
 // 创建NSInvocationOperation对象
     NSInvocationOperation *operation1 = [[NSInvocationOperation alloc] initWithTarget:self selector:@selector(testAction) object:nil];
     // block方式创建
@@ -1060,6 +1071,7 @@ NSBlockOperation *operation2 = [NSBlockOperation blockOperationWithBlock:^{
 ```
 ```
 --- 添加依赖关系 ---
+
 // 这样就可以设置执行先后顺序
 NSOperationQueue *queue = [[NSOperationQueue alloc] init];  
   
@@ -1103,7 +1115,6 @@ NSBlockOperation *opB = [NSBlockOperation blockOperationWithBlock:^{
 // 使用方法跟上面一样，添加到你想要等待queue在其之前完成的队列当中
 // 跟 GCD 中的栅拦一样，队列前面的先执行，在这行后面添加的操作后执行
 
-
     NSOperationQueue *queue = [[NSOperationQueue alloc] init];
     for (int i = 0; i < 10; i++) {
         NSInvocationOperation *operation = [[NSInvocationOperation alloc] initWithTarget: self selector: @selector(doSomeThing) object: nil];
@@ -1117,6 +1128,79 @@ NSBlockOperation *opB = [NSBlockOperation blockOperationWithBlock:^{
 ```
 
 ### 第44条：通过 Dispatch Group 机制，根据系统资源状况来执行任务
+
+dispatch group 是 GCD 的一项特性，能够把任务分组。 调用者可以等待这组任务执行完毕，也可以在提供回调函数自后继续往下执行，这组任务完成时，调用者会得到通知。
+
+并行和并发的区别
+
+* 并行：多个任务在多个CPU上同时执行，即同一时刻有多个事情在做
+* 并发：多个任务在同一个CPU上交替执行，即同一个时刻只能有一个事情在做
+
+简单使用
+
+```
+- (void)createGroupDispatch
+{
+    dispatch_group_t group = dispatch_group_create();
+    for (int i = 0; i < 10; i++) {
+        dispatch_group_async( group, dispatch_get_global_queue( DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSLog(@"%d", i);
+        });
+    }
+    
+    // 监听任务前面的任务是否执行完成
+    
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        NSLog(@"finish");
+    });
+}
+```
+
+指定任务所属的dispatch group，可以使用在网络请求时，当你想要知道网络是否完成时，在你的网络请求前插入第一句，完成的时候插入第二句，然后就只需要监听所有任务是否完成就可以了。
+
+```
+void dispatch_group_enter(dispatch_group_t group);
+void dispatch_group_leave(dispatch_group_t group);
+```
+
+等待某个线程
+
+```
+long dispatch_group_wait(dispatch_group_t group, dispatch_time_t timeout);
+
+// dispatch_time_t
+
+        dispatch_time(<#dispatch_time_t when#>, <#int64_t delta#>)
+        第一个参数是从什么时间开始,一般直接传 DISPATCH_TIME_NOW; 表示从现在开始
+        第二个参数表示具体的时间长度(不能直接传 int 或 float), 可以写成这种形式 (int64_t)3* NSEC_PER_SEC
+        
+        #define NSEC_PER_SEC 1000000000ull  每秒有1000000000纳秒
+        #define NSEC_PER_MSEC 1000000ull    每毫秒有1000000纳秒
+        #define USEC_PER_SEC 1000000ull     每秒有1000000微秒
+        #define NSEC_PER_USEC 1000ull       每微秒有1000纳秒
+        
+        注意 delta 的单位是纳秒! 
+        1秒的写作方式可以是 1* NSEC_PER_SEC; 1000* NSEC_PER_MSEC; USEC_PER_SEC* NSEC_PER_USEC
+```
+
+```
+// 如果dispatch group 所需要的时间小于 timeout，则返回0，否则返回非0值
+
+    long result = dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC));
+    if (result == 0) {
+        NSLog(@"group finish");
+    }else {
+        NSLog(@"gourp is Process");
+    }
+```
+
+dispatch_group_notify，可以等待所有group的任务完成之后，使块在特定线程执行
+
+```
+void dispatch_group_notify(dispatch_group_t group,
+	dispatch_queue_t queue,
+	dispatch_block_t block);
+```
 
 
 
