@@ -382,6 +382,153 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 内部协议不需要让他人知道，对于写framework有好处吧。
 
 ## 内存管理
+
+### 第29条：理解引用计数
+
+在 MRC 中，我们可以通过NSObject 协议声明了的三个方法操作计数器，以递增或递减其值：
+
+* retain 递增引用计数
+* release 递减引用计数
+* autorelease 等稍后清理autorelease pool的时候再递减引用计数
+
+查看引用计数的方法叫 retainCount
+
+![](/img/in-mpost/Effective-Objective-C/retainCount.png)
+
+上图演示了对象自创建出来之后，经历一个“保留”，两次“释放”操作的过程。
+
+对象在“解除分配”之后，只是放回“可用内存池”。如果执行NSLog时尚未覆写对象内存，那么该对象仍然有效，这时程序不会奔溃。
+
+#### 自动释放池
+
+调用autorelease，此方法会在稍后递减计数，通常是在下一次“事件循环”时递减，不过也可能执行得更早些。
+
+此特性很有用，尤其是在方法中返回对象时更应该用它。
+
+#### 保留环（循环引用）
+
+对于循环中的每个对象来说，至少还有另外一个对象引用它，这将导致内存泄露。（这里泄露的意思是：没有正确释放已经不再使用的内存）
+
+通常采用“弱引用”来解决此问题。
+
+### 第30条：以ARC简化引用计数
+
+使用ARC是，引用计数实际还是要执行的，只不过保留和释放操作现在是有ARC自动为你添加。
+
+由于ARC会自动执行 retain、release、autorelease 等操作，所以直接在ARC下调用这些内存管理方法是非法的。(这里说的是调用，dealloc可以重写)
+
+* retain
+* release
+* autorelease
+* dealloc
+
+#### 使用ARC时必须遵循的方法命名规则
+
+方法名以下列词语开头，则其返回的对象归调用者所有：
+
+* alloc
+* new
+* copy
+* mutableCopy
+
+归调用者所有的意思是：调用上述四种方法的那段代码要负责释放方法所返回的对象。
+
+```
+- (MINPerson *)newPerson
+{
+    MINPerson *newPerson = [[MINPerson alloc] init];
+    return newPerson;
+}
+
+- (MINPerson *)somePerson
+{
+    MINPerson *person = [[MINPerson alloc] init];
+    return person;
+}
+
+- (void)doSomething {
+    MINPerson *personOne = [self newPerson];
+    MINPerson *personTwo = [self somePerson];
+    
+    /* 当这段代码执行完后，ARC需要去清理它们。
+       personOne归这段代码所有，所以它需要执行release
+       而personTwo不归这个代码所有，所以它不需要执行release
+    */
+}
+```
+
+使用ARC还有其他好处，它可以执行一些手工操作很难甚至无法完成的优化。例如，在编译期，ARC会把能够相互抵消的retain、release和autorelease 操作约简。如果发现在同一个对象上执行了多次“保留”和“释放”操作，那么ARC有时会可以成对地移除这两个操作。
+
+```
+// _myperson 是一个强引用变量
+
+_myPerson = [MINPerson personWithName:@"MIN"];
+```
+
+由于实例变量是一个强引用，所以编译器会在设置其值的时候执行一次保留操作。上面的代码下MRC中与下面的等效：
+
+```
+MINPerson *tmp = [MINPerson personWithName:@"MIN"];
+_myPerson = [tmp retain];
+```
+
+此时应该可以看出，“personWithName:”方法里的 autorelease 与上段代码中的 retain 都是多余的。为提升性能，可将而这删去。但是ARC考虑到“向后兼容性”，以兼容那些不使用ARC的代码。
+
+不过，ARC 可以运行期检测到这一对多余的操作，也就是 autorelease 及紧跟其后的 retain。
+
+为了优化代码，在方法返回自动释放的对象时，要执行一个特殊函数。此时不直接调用对象的 autorelease 方法，而是改为调用 objc_autoreleaseReturnValue。此函数会检视方法返回之后将要执行的那段代码。若发现那段代码在返回的对象上执行 retain 操作，则设置全局数据结构（此数据结构的具体内容因处理器而异）中的一个标志位，而不执行 autorelease 操作。与之相似，如果方法返回了一个自动释放的对象，而调用方法的代码要保留这个对象，那么此时不直接执行retain，而是改为执行 objc_retainAutoreleaseReturnValue函数。此函数要检测刚才提到的标志位，如果设置了，则不执行 retain 操作。设置标志位，要比调用 autorelease 和 retain 更快。
+
+#### 变量的内存管理语义
+
+ARC 与会处理局部变量与实例变量的内存管理。默认情况下，每个变量都是指向对象的强引用。
+
+在应用程序中，可用下列修饰符来改变局部变量与实例变量的语义：
+
+* __strong: 默认语义，保留此值
+* __unsafe__unretained: 不保留此值，这么做可能不安全，因为等到再次使用变量时，其对象已经被回收了，而变量还指向那块内存
+* __weak: 不保留此值，但是变量可以安全使用，因为如果系统把这个对象回收了，那么变量也会指向nil
+* __autoreleasing: 把对象“按引用传递”给方法时，使用这个特殊的修饰符。此值在方法返回时自动释放。
+
+我们经常会给局部变量加上修饰符，用以打破由“块”所引入的“循环引用”。块会自动保留其所捕获的全部对象（参考第40条），而如果这其中有某个对象又保留块本身，那么就可能导致“循环引用”。可以通过 __weak 来打破。
+
+```
+NSURL *url = [NSURL URLWithString:@"MFNothing.cn"];
+MINNetworkManager *networkManager = [[MINNetworkManager alloc] initWithURL: url];
+MINNetworkManager *__weak weakNetworkManager = networkManager;
+[networkManager startWithCompletion:^(BOOL success){
+	NSLog(@"Finish from %@", weakNetworkManager.url);
+}];
+```
+
+#### ARC如何清理实例变量
+
+在手动管理时，凡是具备强引用的变量，都必须释放，我们可能会编写类似下面的代码。
+
+```
+-  (void)dealloc{
+	[_foo release];
+	[_bar release];
+	[super dealloc];
+}
+```
+
+ARC会在dealloc 方法中插入这些代码。而不需要手动编写 dealloc 方法了，因为ARC会借用 Objective-C++的一项特性来生成清理例程。回收Objective-C++对象时，待回收的对象会调用所有C++对象的析构函数。编译器如果发现某个对象含有C++对象，就会生成名为.cxx_destruct 的方法。而ARC则借助此特性，在该方法中生成清理内存所需的代码。
+
+不过，如果有非Objective-C 的对象，比如CoreFoundation 中的对象或是由malloc()分配在堆中内存，那么仍然需要清理。ARC 环境下，dealloc 方法可以像这样写：
+
+```
+- (void)dealloc {
+	CFRelease(_coreFoundationObject);
+	free(_heapAllocatedMemoryBlob);
+}
+```
+
+**要点**
+
+* ARC 只负责管理Objective-C对象的内存。尤其注意：CoreFoundation对象不归ARC管理，开发者必须适时调用 CFRetain/CFRelease。
+* ARC 管理对象生命周期的办法基本上就是：在合适的地方插入“保留”及“释放”操作。在ARC 环境下，变量的内存管理语义可以通过修饰符指明，而原来则需要手工执行“保留”及“释放”操作。
+
+
 ## 块与大中枢派发
 
 ### 第37条：理解“块”这一概念
@@ -1155,6 +1302,7 @@ dispatch group 是 GCD 的一项特性，能够把任务分组。 调用者可�
     });
 }
 ```
+**dispatch_group_enter 和 dispatch_group_wait**
 
 指定任务所属的dispatch group，可以使用在网络请求时，当你想要知道网络是否完成时，在你的网络请求前插入第一句，完成的时候插入第二句，然后就只需要监听所有任务是否完成就可以了。
 
@@ -1163,7 +1311,53 @@ void dispatch_group_enter(dispatch_group_t group);
 void dispatch_group_leave(dispatch_group_t group);
 ```
 
-等待某个线程
+**dispatch_group_wait**
+
+等待某个线程,会阻塞当前线程，等待timeout的时间，所以你设置DISPATCH_TIME_FOREVER的时候，它会等前面加入group的任务全部执行完成之后才会进行下一步。
+
+```
+    dispatch_group_t group = dispatch_group_create();
+    for (int i = 0; i < 10; i++) {
+        dispatch_group_async( group, dispatch_get_global_queue( DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSLog(@"start %d",i);
+            [NSThread sleepForTimeInterval: 10];
+            NSLog(@"end %d", i);
+        });
+    }
+    
+    // 如果dispatch group 所需要的时间小于 timeout，则返回0，否则返回非0值
+    
+    long result = dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
+    if (result == 0) {
+        NSLog(@"group finish");
+    }else {
+        NSLog(@"gourp is Process");
+    }
+```
+
+```
+2018-05-03 09:51:40.089314+0800 GCD[50816:1863051] start 2
+2018-05-03 09:51:40.089313+0800 GCD[50816:1863054] start 1
+2018-05-03 09:51:40.089314+0800 GCD[50816:1863052] start 0
+2018-05-03 09:51:40.089323+0800 GCD[50816:1863053] start 3
+2018-05-03 09:51:40.089355+0800 GCD[50816:1863059] start 4
+2018-05-03 09:51:40.089414+0800 GCD[50816:1863061] start 5
+2018-05-03 09:51:40.089438+0800 GCD[50816:1863062] start 6
+2018-05-03 09:51:40.089469+0800 GCD[50816:1863063] start 7
+2018-05-03 09:51:40.089515+0800 GCD[50816:1863064] start 8
+2018-05-03 09:51:40.089531+0800 GCD[50816:1863065] start 9
+2018-05-03 09:51:50.092983+0800 GCD[50816:1863052] end 0
+2018-05-03 09:51:50.092983+0800 GCD[50816:1863051] end 2
+2018-05-03 09:51:50.092983+0800 GCD[50816:1863053] end 3
+2018-05-03 09:51:50.092983+0800 GCD[50816:1863061] end 5
+2018-05-03 09:51:50.092983+0800 GCD[50816:1863059] end 4
+2018-05-03 09:51:50.092983+0800 GCD[50816:1863054] end 1
+2018-05-03 09:51:50.093044+0800 GCD[50816:1863063] end 7
+2018-05-03 09:51:50.093044+0800 GCD[50816:1863062] end 6
+2018-05-03 09:51:50.093049+0800 GCD[50816:1863064] end 8
+2018-05-03 09:51:50.093049+0800 GCD[50816:1863065] end 9
+2018-05-03 09:51:50.094299+0800 GCD[50816:1862995] group finish
+```
 
 ```
 long dispatch_group_wait(dispatch_group_t group, dispatch_time_t timeout);
@@ -1194,7 +1388,9 @@ long dispatch_group_wait(dispatch_group_t group, dispatch_time_t timeout);
     }
 ```
 
-dispatch_group_notify，可以等待所有group的任务完成之后，使块在特定线程执行
+**dispatch_group_notify** 
+
+可以等待所有group的任务完成之后，使块在特定线程执行，注意这个你在group的任意位置写都会等加入这个group的所有任务完成的才执行。
 
 ```
 void dispatch_group_notify(dispatch_group_t group,
@@ -1202,6 +1398,178 @@ void dispatch_group_notify(dispatch_group_t group,
 	dispatch_block_t block);
 ```
 
+**dispatch_apply**
+
+反复执行一定次数，每次传给块的参数值都会递增，从 0 开始，直至iterations-1。
+
+```
+- (void)createDispatchApply
+{
+    dispatch_queue_t queue = dispatch_get_global_queue( DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    dispatch_apply(10, queue, ^(size_t i) {
+        NSLog(@"%zu", i);
+    });
+}
+```
+
+### 第45条：使用 dispatch_once 来执行只需要运行一次的线程安全的代码
+
+通常单例编写，使用锁来
+
+```
+@implementation SynchronizedObj
+
++ (instancetype)sharedInstance
+{
+    return [[self alloc] init];
+}
+
++ (instancetype)allocWithZone:(struct _NSZone *)zone
+{
+    static id _sharedInstance;
+    @synchronized(self) {
+        if (_sharedInstance == nil) {
+            _sharedInstance = [super allocWithZone: zone];
+        }
+    }
+    return _sharedInstance;
+}
+@end
+```
+
+dispatch_once 的写法，系统会判断这个代码执行过没，如果执行过，就不会再执行了。
+
+```
+@implementation DispatchOnceObj
+
+static id _sharedInstance = nil;
+
++ (instancetype)sharedInstance
+{
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        _sharedInstance = [[self alloc] init];
+    });
+    return _sharedInstance;
+}
+
++ (instancetype)allocWithZone:(struct _NSZone *)zone
+{
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        _sharedInstance = [super allocWithZone: zone];
+    });
+    return _sharedInstance;
+}
+
+@end
+```
+
+### 第47条：不要使用 dispatch_get_current_queue
+
+dispatch_get_current_queue 返回的是当前的队列，但是当前队列是最里层的那个队列。
+
+```
+- (void)createDispatchGetCurrentQueue
+{
+    dispatch_queue_t queueA = dispatch_queue_create("queue A", DISPATCH_QUEUE_SERIAL);
+    dispatch_queue_t queueB = dispatch_queue_create("queue B", DISPATCH_QUEUE_SERIAL);
+    dispatch_set_target_queue(queueB, queueA);
+    static int kQueueSpecific;
+    CFStringRef queueSepcificValue = CFSTR("queuA");
+    dispatch_queue_set_specific(queueA, &kQueueSpecific, (void*)queueSepcificValue, (dispatch_function_t)CFRelease);
+    dispatch_sync(queueA, ^{
+        NSLog(@"queueA");
+        dispatch_block_t block = ^{
+            NSLog(@"queueAA");
+        };
+        CFStringRef retrievedValue = dispatch_get_specific(&kQueueSpecific);
+        if (retrievedValue) {
+            block();
+        }else {
+            dispatch_sync(queueB, ^{
+            });
+        }
+    });
+}
+```
+
+* dispatch_get_current_queue 函数的行为常常与开放着所预期的不同。此函数已经废弃，只应做调试之用。
+* 由于派发队列是按层级来组织的，所以无法单用某个队列对象来描述当前“当前队列”这一概念。
+* dispatch_get_current_queue 函数用于解决由于不可重入的代码所引发的死锁，然而能用此函数解决的问题，通常也能改用“队列特定数据”来解决。
+
+#### dispatch_set_target_queue
+
+第一个参数表示要变更优先级的队列，第二个参数表示优先级参考右边的队列
+
+```
+void dispatch_set_target_queue(dispatch_object_t object,
+		dispatch_queue_t _Nullable queue);
+```
+
+第一个作用，是改变队列的优先级。
+
+dispatch_queue_create函数生成的DisPatch Queue不管是Serial DisPatch Queue还是Concurrent Dispatch Queue，执行的优先级都与默认优先级的Global Dispatch queue相同，即是下面的globalQueue 的优先级跟 serialQueue 和 concurrentQueue的优先级相同。
+
+```
+dispatch_queue_t globalQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+
+dispatch_queue_t serialQueue = dispatch_queue_create("SERIAL", DISPATCH_QUEUE_SERIAL);
+
+dispatch_queue_t concurrentQueue = dispatch_queue_create("CONCURRENT", DISPATCH_QUEUE_CONCURRENT);
+
+```
+
+第二个作用，创建队列的层次体系，让不同队列中的任务同步执行。创建一个串行队列，然后其他队列的target都指向它。（这里需要知道，多个的串行队列的任务，是同时执行的，在不指定target的时候）
+
+```
+- (void)testTargetQueue2 {
+    //创建一个串行队列queue1
+    dispatch_queue_t queue1 = dispatch_queue_create("test.1", DISPATCH_QUEUE_SERIAL);
+    //创建一个并行队列queue2
+    dispatch_queue_t queue2 = dispatch_queue_create("test.2", DISPATCH_QUEUE_CONCURRENT);
+    // target队列
+    dispatch_queue_t targetQueu = dispatch_queue_create("test.1", DISPATCH_QUEUE_SERIAL);
+    //使用dispatch_set_target_queue()实现队列的动态调度管理
+    dispatch_set_target_queue(queue1, targetQueu);
+    dispatch_set_target_queue(queue2, targetQueu);
+    
+    for (NSInteger i = 0; i < 3; i++) {
+        dispatch_async(queue1, ^{
+            NSLog(@"queue1:,%ld\n%@", i, [NSThread currentThread]);
+        });
+        dispatch_async(queue2, ^{
+            NSLog(@"queue2:,%ld\n%@", i, [NSThread currentThread]);
+        });
+        dispatch_async(queue1, ^{
+            NSLog(@"queue3:,%ld\n%@", i, [NSThread currentThread]);
+        });
+    }
+}
+```
+这里可以发现queue2会让queue1中的所有任务全部执行完之后，才会开始执行。这里queue2是串行或并行队列并不会影响这个打印结果。先加入的任务的队列会被先执行完。下一个队列会等这个队列的任务全部执行之后才执行。
+
+```
+2018-05-03 14:40:23.011185+0800 GCD[56271:2073269] queue1:,0
+<NSThread: 0x608000279c40>{number = 3, name = (null)}
+2018-05-03 14:40:23.011350+0800 GCD[56271:2073269] queue3:,0
+<NSThread: 0x608000279c40>{number = 3, name = (null)}
+2018-05-03 14:40:23.011483+0800 GCD[56271:2073269] queue1:,1
+<NSThread: 0x608000279c40>{number = 3, name = (null)}
+2018-05-03 14:40:23.011626+0800 GCD[56271:2073269] queue3:,1
+<NSThread: 0x608000279c40>{number = 3, name = (null)}
+2018-05-03 14:40:23.011756+0800 GCD[56271:2073269] queue1:,2
+<NSThread: 0x608000279c40>{number = 3, name = (null)}
+2018-05-03 14:40:23.011936+0800 GCD[56271:2073269] queue3:,2
+<NSThread: 0x608000279c40>{number = 3, name = (null)}
+2018-05-03 14:40:23.012061+0800 GCD[56271:2073269] queue2:,0
+<NSThread: 0x608000279c40>{number = 3, name = (null)}
+2018-05-03 14:40:23.012200+0800 GCD[56271:2073269] queue2:,1
+<NSThread: 0x608000279c40>{number = 3, name = (null)}
+2018-05-03 14:40:23.012340+0800 GCD[56271:2073269] queue2:,2
+<NSThread: 0x608000279c40>{number = 3, name = (null)}
+```
 
 
 ## 系统框架
