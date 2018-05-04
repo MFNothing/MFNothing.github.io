@@ -413,7 +413,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 
 ### 第30条：以ARC简化引用计数
 
-使用ARC是，引用计数实际还是要执行的，只不过保留和释放操作现在是有ARC自动为你添加。
+使用ARC是，引用计数实际还是要执行的，只不过保留和释放操作现在是由ARC自动为你添加。
 
 由于ARC会自动执行 retain、release、autorelease 等操作，所以直接在ARC下调用这些内存管理方法是非法的。(这里说的是调用，dealloc可以重写)
 
@@ -528,6 +528,222 @@ ARC会在dealloc 方法中插入这些代码。而不需要手动编写 dealloc 
 * ARC 只负责管理Objective-C对象的内存。尤其注意：CoreFoundation对象不归ARC管理，开发者必须适时调用 CFRetain/CFRelease。
 * ARC 管理对象生命周期的办法基本上就是：在合适的地方插入“保留”及“释放”操作。在ARC 环境下，变量的内存管理语义可以通过修饰符指明，而原来则需要手工执行“保留”及“释放”操作。
 
+### 第31条：在 dealloc 方法中只释放引用并解除监听
+
+对象在经历起生命期后，最终会被系统所回收，这时就要执行dealloc 方法了。在每个对象的生命期内，此方法仅执行一次。系统会在适当的时候调用它，所以我们不应该去自己调用的dealloc 方法。而且一旦调用过dealloc 之后，对象就不在有效，后续方法调用均是无效的。
+
+dealloc 方法主要就是释放对象所拥有的引用，也就是把所有 Objective-C 对象都释放掉，ARC 会通过自动生成的 .cxx_destruct 方法，在 dealloc 中为你自动添加这些释放代码。对象所拥有的其他非 Objective-C 对象也需要释放，但是需要我们自己去操作。
+
+在 dealloc 方法中，通常还需要把原来配置过的观测行为都清理掉。
+
+```
+- (void)dealloc {
+	CFRelease(coreFoundationObject);
+	[[NSNotificationCenter defaultCenter] removeObserver: self];
+}
+```
+
+这里如果不使用ARC的话，在最后还需要调用 "[super dealloc];"和释放所有持有的对象。
+
+dealloc 方法不应该去释放开销较大或系统内稀缺的资源，例如文件描述符、套接字、大块内存等。通常做法，实现另外一个方法，当应用程序用完资源对象后，就调用此方法。
+
+像某对象管理着连接服务器用的套接字。
+
+```
+#import <Foundation/Foundation.h>
+
+@interface MINServerConnection: NSObject
+- (void)open:(NSString *)address;
+- (void)close;
+```
+
+在清理方法而不是 dealloc 方法中清理资源还有一个原因，就是系统并不保证每个创建对象的对象的 dealloc 都会执行。极个别情况下，当应用程序终止是，仍有对象处于存活状态，这些对象没有收到 dealloc 消息。由于应用程序终止之后，其占用的资源也会返回操作系统，所以实际上这些对象也就等于消亡了。不调用 dealloc 方法是为了优化程序效率。
+
+在 MAC OS X 及 iOS 应用程序所对应的 application delegate 中，都含有一个会于程序终止时调用的方法。如果一定要清理某些对象，那么可在此方法中调用对象的 “清理方法”。
+
+在 MAC OS X 系统里，应用程序终止是会调用 NSApplicationDelegate 之中的下述方法：
+
+```
+- (void)applicationWillTerminate:(NSNotification *)notification
+```
+而在 iOS 系统中，应用程序终止是会调用 UIApplicationDelegate 之中的下述方法：
+
+```
+- (void)applicationWillTerminate:(UIApplication *)application
+```
+
+在 dealloc 中为了避免开发者忘记调用“清理方法”，也要调用“清理方法”。
+
+```
+- (void)close {
+	/*clean up resources*/
+	_closed = YES;
+}
+
+- (void)dealloc {
+	if (!_closed) {
+		NSLog(@"ERROR: close was not called before dealloc");
+		[self close];
+	}
+}
+```
+
+在编写 dealloc 方法时还需注意，不要在里面随便调用其他方法。前面是为了查错调用。如果调用的方法还需要异步需要执行某些任务，可能当任务回调时，对象已经被摧毁了，这时会导致许多问题，且经常使程序崩溃。
+
+在 dealloc 里也不要调用属性的存取方法，因为有人可能会覆写这些方法，并于其中做一些无法在回收阶段安全执行的操作。此外，属性可能正处于 KVO 机制的监控下，该属性的观察者可能会在属性值改变是 “保留” 或使用这个即将回收的对象。这种做法会令运行期系统的状态完全失调，从而导致一些莫名其妙的错误。
+
+**要点**
+
+* 在 dealloc 方法里，应该做的事情就是释放指向其他对象的引用，并取消原来订阅的“键值观测（KVO）”或 NSNotificationCenter 等通知，不要做其他事情。
+* 如果对象持有文件描述符等系统资源，那么应该专门编写一个方法来释放这种资源。这样的类要和其使用者约定：用完资源后必须调用close方法。
+* 执行异步任务的方法不应在 dealloc 里调用，只能在正常状态下执行的那些方法也不应该在 dealloc 里调用，因为此时对象已处于正在回收的状态了。
+
+### 第32条：编写“异常安全代码”时留意内存管理问题
+
+在当前运行期系统中，C++ 和 Objective-C 的异常相互兼容，也就是说，从其中一门语言抛出的异常能够用另外一门语言所编写的“异常处理代码”来捕获。纯C中没有异常。
+
+Objective-C 的错误模型表明，异常只应该发生在严重错误后抛出。
+
+当我们使用第三方库而此程序库抛出的异常又不受你控制时，就需要捕获及处理异常了。此外当用使用系统库时，有时也会出现异常，比如使用KVO时，注销一个尚未注册的“观察者”。
+
+在 try 块中，如果先保留了某个对象，然后在释放他之前又抛出了异常，那么除非 catch 块能够处理此问题，否则对象所占内存就将泄露。C++ 的析构函数由 Objective-C 的异常处理例程来运行。 这对 C++ 对象很重要，由于抛出异常会缩短其生命期，所以发送异常时必须析构，不然就会泄露，而文件句柄等系统资源因为没有正确清理，所以就更容易因此而泄露了。
+
+在 MRC 下管理
+
+```
+    NSObject *obj;
+    @try {
+        obj = [[NSObject alloc] init];
+        [obj performSelector: @selector(doSomehingThatMayThrow) withObject: nil];
+    }
+    @catch (...){
+        NSLog(@"something wrong");
+    }
+    @finally {
+        [obj release];
+    }
+```
+这里 @finally 保证在出现异常的时候回执行一次，但是也要引用obj，所以要将它移到 @try 块外面，像上面一样。
+
+在 ARC 环境下，问题会更加严重，我们无法直接调用 release 操作，所以无法向 MRC 那样吧释放操作移到 @finally 块中。在默认情况ARC不会自动处理，因为这样做需要计入大量样板代码，以便追踪待清理的对象，从而在抛出异常时将其释放。这些代码会严重影响运行期的性能，即便不抛异常时也如此。并且会增加应用程序大小。
+
+在 Objective-C++ 模式时，编译器会自动把 -fobjc-arc-exceptions 标志打开。
+
+如果手动管理引用计数，而且必须捕获异常时，要设法保证所编写的代码能把对象正确清理干净。若使用 ARC 且必须捕获异常，则需打开编译器的 
+在 Objective-C++ 模式时，编译器会自动把 。
+
+但最重要的的是：在发现大量异常捕获操作时，应该考虑重构代码。
+
+**要点**
+
+* 捕获异常是，一定要注意将 try 块内所创建的对象清理干净。
+* 在默认情况下，ARC 不生成安全处理异常所需要的清理代码。开启编译器标志后(-fobjc-arc-excaptions 跟那个-fno-objc-arc设置位置应该一样)，可生成这种代码，不过会导致应用程序变大，而且会降低运行效率。
+
+
+### 第33条：以弱引用避免循环引用
+
+弱引用的方式
+
+* unfase_unretained：用unfase_unretained 修饰的属性特质，其语义同 assign 特质等价。assign 通常只用于“原生类型”（int、float、结构体等），unsafe_unreturned 则多用于对象类型。
+* weak：它与 unfase_unretained 的作用完全相同，然而，系统只要把属性回收，属性值就会自动设为nil
+
+```
+@property (nonatomic, unsafe_unretained) NSObject *unsafeObj;
+@property (nonatomic, weak) NSObject *weakObj;
+```
+
+
+**要点**
+
+* 将某些引用设为weak，可避免出现“循环引用”
+* weak 引用可以自动清空，也可以不自动清空。自动清空是随着 ARC 而引入的新特性，由运行期系统来实现。在具备自动清空功能的弱引用上，可以随意读取数据，因为这种引用不会指向已经释放的对象。
+
+### 第34条：以“自动释放块”降低内存峰值
+
+释放对象有两种方式：
+
+* 一种是调用 release 方法，使其保留计数立即递减；
+* 另一种是调用 autorelease 方法，将其加入“自动释放池”中。自动释放池用于存放那些需要在稍后某个时刻释放的对象。清空（drain）自动释放池时，系统会向其中的对象发送 release 消息。
+
+创建自动释放池的语法：
+
+```
+    @autoreleasepool {
+        
+    }
+```
+
+Mac OS X 与 iOS 应用程序分别运行于 Cocoa 及 Cocoa Touch 环境中。系统会自动穿甲一些默认有自动释放池的线程，例如主线程或是“大中枢派发”（Grand Central Dispatch，GCD）机制中的线程，每次执行“事件循环”时，就会将其清空。因此，不需要自己来创建“自动释放池块”。
+
+通常只有一个地方需要创建自动释放池，那就是在 main 函数里，我们用自动释放池来包裹应用程序的主入口点。
+
+```
+int main(int argc, char * argv[]) {
+    @autoreleasepool {
+        return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
+    }
+}
+```
+
+这个池可以理解成最外围捕捉全部自动释放对象所用的池，如果注释掉这个自动释放池，那么由 UIApplicationMain 函数所自动释放的那些对象，就没有自动释放的池可以容纳了。虽然会末尾恰好就是应用程序的终止点，而此时操作系统会把程序所占用的全部内存都释放掉。
+
+**自动释放池可以嵌套**
+
+```
+    @autoreleasepool {
+        NSString *string = [NSString stringWithFormat: @"1 = %i", 1];
+        @autoreleasepool {
+            NSNumber *number = [NSNumber numberWithInt: 1];
+        }
+    }
+```
+
+string 放在外围的自动释放池中，而 number 则放在里层的自动释放池中。
+
+自动释放池机制就像“栈”一样。系统创建好自动释放池之后，就将其推入栈中，而清空自动释放池，则相当于将其从栈中弹出。在对象上执行自动释放操作，就等于将其放入栈顶的那个池里。
+
+利用自动释放池，降低应用程序在执行循环时的内存峰值
+
+```
+NSArray *databaseRecords = /* ... */;
+NSMutableArray *people = [NSMutableArray new];
+for (NSDictionary *record in databaseRecords) {
+	@autoreleasepool {
+		MINPerson *person = [[MINPerson alloc] initWithRecord: record];
+		[people addObject: person];
+	}
+}
+```
+
+如果不加这个这个自动释放池，这些自动释放的对象会放在线程的主池里面。而它们本来应该被提早回收的。
+
+尽管自动释放池的开销不太大，但毕竟还是有的，所以尽量不要建立额外的自动释放池。首先的监控内存用量，判断有没有需要解决的问题。
+
+在ARC之前还有一个老式写法，使用 NSAutoreleasePool 对象（只能在MRC中使用）。
+
+```
+NSArray *databaseRecords = /* ... */;
+NSMutableArray *people = [NSMutableArray new];
+int i = 0;
+
+NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+for (NSDictionary *record in databaseRecords) {
+	MINPerson *person = [[MINPerson alloc] initWithRecord: record];
+	[people addObject: person];
+	if (++i == 10) {
+		[pool drain];
+		i = 0;
+	}
+}
+```
+
+相比之下 @autoreleasepool 更方便使用（在作用域外不可使用），NSAutoreleasePool还需要指定在什么时候释放（容易出现提前释放）。
+
+**要点**
+
+* 自动释放池排布在栈中，对象收到 autorelease 消息后，系统将其放入最顶端的池里。
+* 合理运用自动释放池，可降低应用程序的内存峰值。
+* @autoreleasepool 这种新式写法能创建出更为轻便的自动释放池。
 
 ## 块与大中枢派发
 
