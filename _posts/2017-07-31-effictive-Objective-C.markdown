@@ -485,7 +485,7 @@ ARC 与会处理局部变量与实例变量的内存管理。默认情况下，�
 在应用程序中，可用下列修饰符来改变局部变量与实例变量的语义：
 
 * __strong: 默认语义，保留此值
-* __unsafe__unretained: 不保留此值，这么做可能不安全，因为等到再次使用变量时，其对象已经被回收了，而变量还指向那块内存
+* __unsafe_unretained: 不保留此值，这么做可能不安全，因为等到再次使用变量时，其对象已经被回收了，而变量还指向那块内存
 * __weak: 不保留此值，但是变量可以安全使用，因为如果系统把这个对象回收了，那么变量也会指向nil
 * __autoreleasing: 把对象“按引用传递”给方法时，使用这个特殊的修饰符。此值在方法返回时自动释放。
 
@@ -630,7 +630,7 @@ Objective-C 的错误模型表明，异常只应该发生在严重错误后抛�
 在 Objective-C++ 模式时，编译器会自动把 -fobjc-arc-exceptions 标志打开。
 
 如果手动管理引用计数，而且必须捕获异常时，要设法保证所编写的代码能把对象正确清理干净。若使用 ARC 且必须捕获异常，则需打开编译器的 
-在 Objective-C++ 模式时，编译器会自动把 。
+ -fobjc-arc-exceptions 标志打开。
 
 但最重要的的是：在发现大量异常捕获操作时，应该考虑重构代码。
 
@@ -744,6 +744,70 @@ for (NSDictionary *record in databaseRecords) {
 * 自动释放池排布在栈中，对象收到 autorelease 消息后，系统将其放入最顶端的池里。
 * 合理运用自动释放池，可降低应用程序的内存峰值。
 * @autoreleasepool 这种新式写法能创建出更为轻便的自动释放池。
+
+### 第35条：用“僵尸对象”调试内存管理问题
+
+程序在运行的时候，偶尔崩溃，可能是我们向已回收的对象发送消息。奔溃与否完全取决于对象所占内存有没有为其他的内存所覆写。
+
+启用“僵尸对象”这个功能之后，运行期系统会把所有已经回收的实例转化为特殊的“僵尸对象”，而不会真正回收。这种对象所在的核心内存无法重用，因此不可能遭到覆写。僵尸对象收到消息（即执行方法之后）会抛出异常，其中准确说明了发送过来的消息，并描述了回收之前的那个对象。僵尸对象是调试内存管理问题的最佳方式。
+
+从上面的那段话可以看出这个“僵尸对象”的功能可以保证我们不能使用被回收的对象所在的那块内存，并且使用回收后的对象的方法会抛出异常。
+
+通过在 Xcode -> Product -> Scheme -> Edit Scheme -> Diagnostics -> Memory Management -> Zombie Objects 开启功能。
+
+在系统即将回收对象时，如果发现通过环境变量启动了僵尸对象功能，那么将执行一个附加步骤，把对象转化为僵尸对象，而不彻底回收。
+
+僵尸类是从名为 \_NSZombie_ 的模板类复制出来的。
+
+整个转换过程，就是在 NSObject 的 dealloc 方法中，运气期系统如果发现 NSZombieEnabled 环境变量已经设置了（即启用了“僵尸对象”功能），就会 “调配”（swizzle，用替换感觉更好，参加第13条）成一段将 OriginailClass 变为 \_NSZombie_OriginailClass 的代码（OriginailClass代指被回收对象所属的类）。
+
+这里保证了 dealloc 并没有释放掉被回收的对象，虽说内存泄露了，但是这只是调试。制作正式发布的应用程序的时不会把这项功能打开，也就不会存在内存泄露了。
+
+\_NSZombie_ 类（以及所有从该类拷贝出来的类）并未实现任何方法。此类没有超类，因此和 NSObject 一样，也是个“根类”，该类只有一个实例变量，叫做 isa，所有 Objective-C 根类都必须有这个变量。由于这个僵尸类没有实现任何方法，所以发给它的消息都要走“完整的消息转发机制”（参见第12条）。
+
+在完整的消息转发机制中，___forwarding___ 是核心，它首先要做的事情包括检查该接受消息的对象所属的类。若名称的前缀为 \_NSZombie_，则表明消息接受对象是僵尸对象，需要特殊处理。会打印一条消息，僵尸对象所收到的消息及原来的类，然后程序终止。
+
+
+使用 MRC 来执行下面的代码。
+
+```
+@interface MINClass : NSObject
+- (void)logSomeThing;
+@end
+@implementation MINClass
+- (void)logSomeThing
+{
+    NSLog(@"self = %@", self);
+}
+@end
+
+#import <objc/runtime.h>
+
+- (void)testObj
+{
+    MINClass * obj = nil;
+    obj = [[MINClass alloc] init];
+    NSLog(@"Brfore release:");
+    [obj logSomeThing];
+    [self printClassInfo: obj];
+    [obj release];
+    NSLog(@"After release:");
+    [self printClassInfo: obj];
+    [obj logSomeThing];
+}
+
+- (void)printClassInfo:(id)obj
+{
+    Class cls = object_getClass(obj);
+    Class superClass = class_getSuperclass(cls);
+    NSLog(@"=== %s : %s ===", class_getName(cls), class_getName(superClass));
+}
+```
+
+**要点**
+
+* 系统在回收对象时，可以不将其真的回收，而是把它转化为僵尸对象。通过环境变量 NSZoobieEnabled 可开启这个功能。
+* 系统会修改对象的 isa 指针，令其指向特殊的僵尸类（指向一个新创建的拷贝僵尸类的类），从而使该对象变为僵尸对象。僵尸类能够响应所有的选择子，响应方式为：打印一条包含消息内容及其接受者的消息，然后终止应用程序。
 
 ## 块与大中枢派发
 
