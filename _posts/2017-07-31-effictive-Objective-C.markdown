@@ -809,6 +809,53 @@ for (NSDictionary *record in databaseRecords) {
 * 系统在回收对象时，可以不将其真的回收，而是把它转化为僵尸对象。通过环境变量 NSZoobieEnabled 可开启这个功能。
 * 系统会修改对象的 isa 指针，令其指向特殊的僵尸类（指向一个新创建的拷贝僵尸类的类），从而使该对象变为僵尸对象。僵尸类能够响应所有的选择子，响应方式为：打印一条包含消息内容及其接受者的消息，然后终止应用程序。
 
+### 第36条：不要使用 retainCount
+
+retainCount 方法所返回的保留计数只是某个给定时间点的值，但是该方法并未考虑到系统会稍后把自动释放池清空，因而不会将后续的释放操作从返回值中减去。
+
+所以如果我们用此时的 retainCount 返回的值去判断是否释放该对象，会出问题。
+
+```
+while ([Object retainCount]) {
+	[Object release];
+}
+```
+
+上面的写法为考虑到自动释放操作，只是不停的通过释放操作降低保留计数，直至对象对系统所回收。假如此对象也在自动释放池里，那么稍后系统清空池子的时候还要把它再释放一次，而这将导致程序崩溃。
+
+第二个错误在于：retainCount 可能永远不会返回0，因为有时系统会优化对象的释放操作，在保留计数还是1的时候就把它回收了。这样while就死循环了。
+
+```
+- (void)testRetainCount
+{
+    NSString *string = @"string";
+    NSLog(@"string retainCount = %lu", [string retainCount]);
+    
+    NSNumber *numberI = @1;
+    NSLog(@"numberI retainCount = %lu", [numberI retainCount]);
+    
+    NSNumber *numberF = @3.14;
+    NSLog(@"numberF retainCount = %lu", [numberF retainCount]);
+}
+```
+
+```
+2018-05-08 10:08:27.542838+0800 memory management[2035:69502] string retainCount = 18446744073709551615
+2018-05-08 10:08:27.542954+0800 memory management[2035:69502] numberI retainCount = 9223372036854775807
+2018-05-08 10:08:27.543044+0800 memory management[2035:69502] numberF retainCount = 1
+```
+
+第一个对象保留计数是 2^64 - 1，第二个对象保留计数是 2^63 - 1。由于二者皆为“单例对象”，所以其保留计数都很大。系统会尽可能把 NSString 实现成单例对象。如果字符串像上面那种形式，是一个编译器常量，编译器会把 NSString 对象所表示的数据放到应用程序的二进制文件里，运行程序时就可以直接用，无需创建 NSString 对象了。
+
+NSNumber 类似，使用了一种叫做“标签指针”（tagged pointer）的概念来标注特定类型的数值（这里一般是整形）。这种做法不使用 NSNumber 对象，而是把与数值有关的全部信息都放在指针值里面。运行期系统会在消息派发期间检测这种标签指针，并对它执行响应操作，使其行为看起来和真正的 NSNumber 对象一样。
+
+另外，对于这种对象的保留及释放操作都是“空操作”（no-op）。
+
+**要点**
+
+* 对象的保留计数看似有用，实则不然，因为任何给定时间点的“绝对保留计数”都无法反映对象的生命期的全貌。
+* 引入 ARC 之后，retainCount 方法就正式废止了，在 ARC 下调用该方法会导致编译器错误。
+
 ## 块与大中枢派发
 
 ### 第37条：理解“块”这一概念
@@ -993,7 +1040,7 @@ typedef void (^CopyBlock)(void);
 虽然block类型不一样，但是地址是相同的。
 
 
-### 第39条：为常用的块类型创建 typedef
+### 第38条：为常用的块类型创建 typedef
 
 目的是为了增加代码可读性。
 
