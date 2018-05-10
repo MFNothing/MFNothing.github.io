@@ -276,6 +276,124 @@ readonly 属性拥有getter方法
 ## 接口与API设计
 ## 协议与分类
 
+### 第23条：通过委托与数据源协议进行对象间通信
+
+如果设置代理出现下面的错误，是因为协议没有从 NSObject 继承。
+
+```
+No known instance method for selector 'respondsToSelector:'
+```
+
+我们通常可以把委托对象能否响应某个协议方法这一信息缓存起来，以优化程序效率。
+
+```
+@class MINNetworkFetcher;
+@protocol MINNetworkFetcherDelegate <NSObject>
+@optional
+- (void)networkFetcher:(MINNetworkFetcher *)fetcher
+         didReciveData:(NSData *)data;
+- (void)networkFetcher:(MINNetworkFetcher *)fetcher
+         didFailWithError:(NSError *)error;
+- (void)networkFetcher:(MINNetworkFetcher *)fetcher
+         didUpdateProgressTo:(float)progress;
+@end
+
+@interface MINNetworkFetcher : NSObject
+@property (nonatomic, weak) id<MINNetworkFetcherDelegate> delegate;
+@end
+```
+
+```
+@interface MINNetworkFetcher()
+{
+    struct {
+        unsigned int didReciveData : 1;
+        unsigned int didFailWithError : 1;
+        unsigned int didUpdateProgressTo : 1;
+    }_delegateFlags;
+}
+@end
+
+@implementation MINNetworkFetcher
+
+- (void)respondsDelegate
+{
+    if (_delegateFlags.didReciveData) {
+        [self.delegate networkFetcher: self didReciveData: [NSData data]];
+    }
+    if (_delegateFlags.didFailWithError) {
+        [self.delegate networkFetcher: self didFailWithError: [NSError errorWithDomain: @"error" code: 0 userInfo: nil]];
+    }
+    if (_delegateFlags.didUpdateProgressTo) {
+        [self.delegate networkFetcher: self didUpdateProgressTo: 10];
+    }
+}
+
+// 在设置代理的时候，去判断代理对象能不能响应协议中的所有方法
+
+- (void)setDelegate:(id<MINNetworkFetcherDelegate>)delegate
+{
+    _delegate = delegate;
+    _delegateFlags.didReciveData = [_delegate respondsToSelector:@selector(networkFetcher:didReciveData:)];
+    _delegateFlags.didFailWithError = [_delegate respondsToSelector:@selector(networkFetcher:didFailWithError:)];
+    _delegateFlags.didUpdateProgressTo = [_delegate respondsToSelector:@selector(networkFetcher:didUpdateProgressTo:)];
+}
+@end
+```
+
+### 第24条：将类的实现代码分散到便于管理的数个分类之中
+
+优点：
+
+* 对现有类进行扩展：比如：可以扩展Cocoa touch框架中的类，在类目中增加的方法会被子类继承，而且在运行时跟其他的方法没有区别。
+* 作为子类的替代手段：不需要定义和使用一个子类，可以通过类目直接向已有的类里增加方法。
+* 对类中的方法归类：利用category把一个庞大的类划分为小块来分别进行开发，从而更好地对类中的方法进行更新和维护。
+
+缺点：
+
+* 不能添加实例变量
+* 类目中的方法会覆盖子类中名字相同的方法，它们拥有更高的优先级
+
+**要点**
+
+* 使用分类机制把类的实现代码划分成易于管理的小块
+* 将应该视为“私有”的方法归入名为 Private 的分类中，以隐藏实现细节。
+
+### 第25条：总是为第三方类的分类名称加前缀
+
+分类机制通常用于向无源码的既有类中新增功能。将分类方法加入类中这一操作是在运行期系统加载分类时完成的。运行期系统会把分类中所实现的每个方法都加入类的方法列表。如果类中本来就有此方法，而分类又实现了一次，那么分类中的方法会覆盖原来那一份实现代码。
+
+但是这样可能会产生多次覆盖，有两个分类都实现了这个方法，这时分类谁最晚加载，方法实现就是谁，所以会产生一些问题。
+
+要解决此问题，一般的做法是：已命名空间来区别各个分类的名称与其中所定义的方法。在 Objective-C 中实现命名空间功能，只有一个方法，就是给相关名称都加上某个公用的前缀。
+
+```
+@interface NSString (MIN_HTTP)
+
+// Encoade a string with URL encoding
+- (NSString *)min_urlEncodedString;
+
+@end
+```
+
+虽然两个分类重名，也不会出错。即便加了前缀，也难保其他分类不会覆盖你所写的方法，然而几率却小了很多，因为其他程序库很小会和你选用同一个前缀。
+
+**要点**
+
+* 向第三方类中添加分类时，总应给其名称加上你专用的前缀。
+* 向第三方类中添加分类时，总应给其他的方法名加上你专用的前缀。
+
+### 第26条：勿在分类中声明属性
+
+分类是的目标是拓展类的功能，而非封装数据。
+
+分类里面可以使用属性，但是由于分类无法合成与属性相关的实例变量，所以开发者需要在分类中为该属性实现存取方法。或者将属性的存取方法声明为 @dynamic。
+
+**要点**
+
+* 把封装数据所用的全部属性都定义在主接口。
+* 在 “class-continuation”之外的其他分类中，可以定义存取方法，蛋尽量不要定义属性。
+
 ### 第二十七条：使用“class-continuation 分类” 隐藏实现细节
 
 
@@ -336,6 +454,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 .mm 拓展名表示编译器应该将此文件按Objective-C++来编译
 
 所以对于EOCClass这个类来说，实现文件需为.mm（将此文件按照Objective-C++来编译），否则无法正确引入SomeCppClass.h。
+
 上面这样写会导致的结果就是引入EOCClass这个类的文件也都需要使用Objective-C++来编写。因为编译器需要完全导入SomeCppClass.h这个类才能知道_cppClass实例变量的大小。
 
 所以最好的方式便是使用“class-continuation 分类”
@@ -380,6 +499,38 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 #### 想使类所遵循的协议不为人所知
 
 内部协议不需要让他人知道，对于写framework有好处吧。
+
+### 第28条：通过协议提供匿名对象
+
+```
+@property (nonatomic, weak) id<MINNetworkFetcherDelegate> delegate;
+```
+
+该属性的类型是 id\<MINNetworkFetcherDelegate>，所以实际上任何类的对象都能充当这一属性，即便该类不继承自 NSObject 也可以，只要遵循 MINNetworkFetcherDelegate 协议就行。对于具备此属性的类来说，delegate 就是“匿名”的。
+
+```
+#import <Foundation/Foundation.h>
+
+@protocol MINDataBaseConnection <NSObject>
+- (void)connect;
+- (void)disconnect;
+- (void)isConnected;
+- (NSArray *)performQuery:(NSString *)query;
+@end
+
+@interface MINDatabseManager : NSObject
++ (id)sharedInstance;
+- (id<MINDataBaseConnection>)connectionWithIdentifier:(NSString *)indentifier;
+@end
+```
+
+注意这个方法 connectionWithIdentifier: 方法。这个方法返回处理数据库连接的类，由于我们使用匿名对象，所以我们可以根据indentifier返回不同框架的类去交给调用者，让他们处理数据库操作。只是这些返回对象都是遵从 MINDataBaseConnection 协议的。
+
+**要点**
+
+* 协议可在某种程度上上提供匿名类型。具体的对象类型可以淡化成遵从某协议的 id 类型，协议里规定了对象所应实现的方法。
+* 使用匿名对象来隐藏类型名称（或类名）。
+* 如果具体类型不重要，重要的是对象能够响应（定义在协议里的）特定方法，那么可以使用匿名对象来表示。
 
 ## 内存管理
 
