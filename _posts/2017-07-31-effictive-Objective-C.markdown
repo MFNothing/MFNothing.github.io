@@ -271,7 +271,284 @@ readonly 属性拥有getter方法
 
 ### 第8条：理解“对象等同性”这一概念
 
-在Objective-C中比较两个对象时使用==操作符，比较的是两个指针本身而非对象。如果需要做对象比较需要使用NSObject协议中声明的“isEqual:”方法来进行比较。
+在Objective-C中比较两个对象时使用==操作符，比较的是两个指针本身而非对象。如果需要做对象比较，需要使用NSObject协议中声明的“isEqual:”方法来进行比较。
+
+**NSObject 协议中有两个用于判断等同性的关键方法:**
+
+```
+- (BOOL)isEqual:(id)object;
+
+- (NSUInteger)hash;
+```
+
+这两个方法的默认实现是：当且仅当其“指针值”完全相同时，这两个对象才相等。
+
+比如有下面这个类：
+
+```
+@interface MINPerson : NSObject
+@property (nonatomic, copy) NSString *firstName;
+@property (nonatomic, copy) NSString *lastName;
+@property (nonatomic, assign) NSUInteger age;
+@end
+```
+
+它的 “isEqual:”方法可以写成：
+
+```
+- (BOOL)isEqual:(id)object
+{
+    if (self == object) {
+        return YES;
+    }
+    if ([self class] != [object class] ) {
+        return NO;
+    }
+    MINPerson *otherPerson = (MINPerson *)object;
+    if (![_firstName isEqualToString: otherPerson.firstName]) {
+        return NO;
+    }
+    if (![_lastName isEqualToString: otherPerson.lastName]) {
+        return NO;
+    }
+    if (_age != otherPerson.age) {
+        return NO;
+    }
+    return YES;
+}
+```
+**覆写 hash 方法：**
+
+```
+- (NSUInteger)hash
+{
+    return 100999;
+}
+```
+
+覆写 hash 方法的时候需要注意，如果我们同一个类的对象返回同一个固定值，在 collection 中使用这种对象将产生性能问题。因为 collection 在检索哈希表时，会用对象的哈希码做索引。假如某个 collection 是用 set 实现的，那么 set 可能会根据哈希码把对象分装到不同的数组（后文也称箱子（bin））。在向 set 中添加新对象是，要根据其哈希码找到与之相关的那个数组，然后遍历其中元素，看数组中已有的对象是否和将要添加的新对象相等。所以如果set里面有100000那个类的对象时，需要将这100000个对象全部扫描一遍。
+
+```
+- (NSUInteger)hash
+{
+    NSString *stringToHash = [NSString stringWithFormat: @"%@:%@:%@", _firstName, _lastName, _age];
+    return [stringToHash hash];
+}
+```
+
+这种写法需要负担创建字符串的开销，所以比返回单一值要慢。把这种对象添加到 collection 中时，也会产生性能问题，因为想要添加，必须先计算其哈希码。
+
+```
+- (NSUInteger)hash
+{
+    NSUInteger firstNameHash = [_firstName hash];
+    NSUInteger lastNameHash = [_lastName hash];
+    NSUInteger ageHash = _age;
+    return firstNameHash ^ lastNameHash ^ ageHash;
+}
+```
+
+这种做法技能保持较高效率，又能使生成的哈希码在一定范围内，而不会过于频繁地重复。
+
+#### 特定类具有的等同性判定方法
+
+如果经常需要判断等同性，那么可能会自己来创建等同性判定方法，因为无须检测参数类型，所以能大大提升检测速度。
+
+好处：
+
+* 令代码看上去更美观、更易读，此动机与 NSString 类“isEqualToString:”方法创建缘由相似，纯粹为了装点门面。
+* 不用检查两个受测对象的类型。
+
+在编写判定方法时，也应一并覆写“isEqual:”方法。
+
+```
+- (BOOL)isEqualToPerson:(MINPerson *)otherPerson {
+    if (self == otherPerson) {
+        return YES;
+    }
+    if (![_firstName isEqualToString: otherPerson.firstName]) {
+        return NO;
+    }
+    if (![_lastName isEqualToString: otherPerson.lastName]) {
+        return NO;
+    }
+    if (_age != otherPerson.age) {
+        return NO;
+    }
+    return YES;
+}
+
+- (BOOL)isEqual:(id)object
+{
+    if ([self class] == [object class]) {
+        return [self isEqualToPerson:(MINPerson *)object];
+    }else {
+        return [super isEqual: object];
+    }
+}
+```
+
+**等同性判定的执行深度**
+
+创建等同性判定方法时，需要决定是根据整个对象来判断等同性，还是仅根据其中几个字段判断。
+
+我们可以根据自己的需求去决定怎样判定两个对象是否相同。
+
+**容器中可变的等同性**
+
+把某个对象放入 collection 之后，就不应该改变其哈希码了。collection 会把各个对象按照其哈希码分装到不同的“箱子数组”中。如果某对象放入“箱子”之后哈希码又变了，那么其现在所处的箱子对于他来说就是“错误”的。（第18条会解释为何要将对象做成不可变的）
+
+```
+    NSMutableArray *arrayA = [@[@1, @2] mutableCopy];
+    [set addObject: arrayA];
+    NSLog(@"set = %@", set);
+    NSMutableArray *arrayB = [@[@1, @2] mutableCopy];
+    [set addObject: arrayB];
+    NSLog(@"set = %@", set);
+    NSMutableArray *arrayC = [@[@1] mutableCopy];
+    [set addObject: arrayC];
+    NSLog(@"set = %@", set);
+    [arrayC addObject: @2];
+    NSLog(@"set = %@", set);
+    NSSet *setB = [set copy];
+    NSLog(@"setB = %@", setB);
+```
+
+打印
+
+```
+2018-05-15 16:19:28.135930+0800 Object Message[7876:302013] set = {(
+        (
+        1,
+        2
+    )
+)}
+2018-05-15 16:19:28.136085+0800 Object Message[7876:302013] set = {(
+        (
+        1,
+        2
+    )
+)}
+2018-05-15 16:19:28.136225+0800 Object Message[7876:302013] set = {(
+        (
+        1
+    ),
+        (
+        1,
+        2
+    )
+)}
+2018-05-15 16:19:28.136349+0800 Object Message[7876:302013] set = {(
+        (
+        1,
+        2
+    ),
+        (
+        1,
+        2
+    )
+)}
+2018-05-15 16:19:28.136490+0800 Object Message[7876:302013] setB = {(
+        (
+        1,
+        2
+    )
+)}
+```
+
+这里看出我们改变arrayC的内容，set的内容会被破坏，set本来就是存放不可重复的对象，这样存放的对象重复了，然后set复制后，又不重复了。改变 collection 中的对象可能会出现的问题是无法预测的。
+
+**要点**
+
+* 若想检测对象的等同性，请提供“isEqual:”与 hash 方法。
+* 相同的对象必须具有相同的哈希码，但是两个哈希码相同的对象却未必相同。
+* 不要盲目地逐个检测每条属性，而是应该依照具体需求来指定检测方案
+* 编写 hash 方法时，应该使用计算速度快而且哈希码碰撞几率低的算法。
+
+### 第9条：以“类族模式”隐藏实现细节
+
+“类族”是一种可以隐藏“抽象基类“背后实现细节的模式。Objective-C 的系统框架中普遍使用此模式。比如 UIButton。
+
+```
++ (instancetype)buttonWithType:(UIButtonType)buttonType;
+```
+
+这样绘制出来的button，用户不需要考虑按钮的绘制方式等实现细节。使用者只需要明白如果创建按钮，如果设置像”标题“这样的属性，如果增加触摸动作的目标对象等问题就好。
+
+这种根据 type 切换绘制方法，如果 type 有很多，就会变得麻烦，我们可以将其绘制方法放到相关子类中去。使用”类族“模式就可以灵活应对多个类，将它们的实现细节隐藏在抽象基类后面，以保持接口简洁。用户无须创建子类实例，只需要调用基类方法来创建。
+
+**创建类族**
+
+```
+typedef NS_ENUM(NSUInteger, MINEmployeeType) {
+    MINEmployeeTypeDeveloper,
+    MINEmployeeTypeDesigner,
+    MINEmployeeTypeFinance,
+};
+
+@interface MINEmployee : NSObject
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, assign) NSUInteger salary;
+
++ (MINEmployee *)employeeWithType:(MINEmployeeType)type;
+- (void)doADaysWork;
+@end
+
+#import "MINEmployeeFinance.h"
+#import "MINEmployeeDesigner.h"
+#import "MINEmployeeDeveloper.h"
+
+@implementation MINEmployee
++ (MINEmployee *)employeeWithType:(MINEmployeeType)type
+{
+    switch (type) {
+        case MINEmployeeTypeDeveloper:
+            return [MINEmployeeDeveloper new];
+            break;
+        case MINEmployeeTypeDesigner:
+            return [MINEmployeeDesigner new];
+            break;
+        case MINEmployeeTypeFinance:
+            return [MINEmployeeFinance new];
+        default:
+            break;
+    }
+}
+- (void)doADaysWork
+{
+    
+}
+@end
+```
+
+子类分别覆写 doADaysWork 方法。
+
+Objective-C 这门语言没有办法指明某个基类是”抽象的“。于是，开发者通常会在文档中写明类的用法。这种情况下，基类接口一般没有名为 init 的成员方法，这暗示该类的实例也许不应该由用户直接创建。
+
+**Cocoa 里的类族**
+
+系统框架中有许多类族。大部分 collection 类都是某个类族的抽象基类。在传统的类族模式中，通常只有一个类具备”公共接口“，这个类就是类族中的抽象基类。
+
+检查某对象是否位于类族中，不要直接检测两个”类对象“是否相同，而应该采用下列代码
+
+```
+    id someEmployee = [MINEmployeeFinance new];
+    if ([someEmployee isKindOfClass: [MINEmployee class]]) {
+        
+    }
+```
+
+**要点**
+
+* 类族模式可以把实现细节隐藏在一套简单的公共接口后面。
+* 系统框架中经常使用类族。（UIButton）
+* 从类族的公共抽象基类中继承子类时要当心，若有开发文档，则应首先阅读。
+
+### 第10条：在既有类中使用关联对象存放自定义数据
+
+### 第11条：理解 objc_msgSend 的作用
+
+
 
 ## 接口与API设计
 ## 协议与分类
@@ -371,6 +648,7 @@ No known instance method for selector 'respondsToSelector:'
 @interface NSString (MIN_HTTP)
 
 // Encoade a string with URL encoding
+
 - (NSString *)min_urlEncodedString;
 
 @end
@@ -409,14 +687,19 @@ No known instance method for selector 'respondsToSelector:'
 	
 ```
 // 这个部分就是 class-continuation
+
 @interface MINClass（）
-{// 块，实例变量声明的地方
+{
+// 块，实例变量声明的地方
 	
 }
 @end
 // 上面的部分是 class-continuation,下面是具体的实现
+
 @implementation MINClass
-{// 括号里面的表示实现块，这里也可以声明实例变量,属性不能在块中声明
+{
+// 括号里面的表示实现块，这里也可以声明实例变量,属性不能在块中声明
+
 	NSString *justString;
 }
 @end
@@ -469,6 +752,7 @@ Objective-C++ 是Objective-C与C++混合体，其代码可以用两个语言编�
 @end
 
 //EOCClass.mm
+
 #import "EOCClass.h"
 
 #include "SomeCppClass.h"
