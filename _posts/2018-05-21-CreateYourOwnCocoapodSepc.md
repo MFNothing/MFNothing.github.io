@@ -168,6 +168,46 @@ end
 	- May 21st, 03:14: Push for `MINTemp 0.0.1' has been pushed (1.806639077 s).
 	```
 	
+### 一些查找资料中遇到的点
+
+#### tag
+
+```
+删除本地tags
+git tag -d + 分支名称就会删除本地的分支
+git tag -d 0.0.1
+删除远程分支
+git push origin :refs/tags/分支名称 就删除了远程分支
+git push origin :refs/tags/0.0.1
+```
+
+#### pod 描述文件其他配置，待测试
+
+```
+  s.subspec 'Serialization' do |ss|
+    ss.source_files = 'AFNetworking/AFURL{Request,Response}Serialization.{h,m}'
+    po= 'AFNetworking/AFURL{Request,Response}Serialization.h'
+    ss.watchos.frameworks = 'MobileCoreServices', 'CoreGraphics'
+    ss.ios.frameworks = 'MobileCoreServices', 'CoreGraphics'
+    ss.osx.frameworks = 'CoreServices'
+  end
+```
+
+*  s.subspec 创建了一个名字 Serialization 的文件夹
+*  ss.source_files 指明资源文件位置
+*  ss.public_header_files 这个文件夹中的公共头文件
+*  ss.watchos.frameworks 手表环境下依赖的系统库
+*  ss.ios.frameworks iOS环境下依赖的系统库
+*  ss.osx.frameworks   osx 环境下依赖的系统库
+
+
+```
+引用第三方 framework
+ss.vendor_frameworks = "thirdSdk.framework"
+引用第三方 .a
+ss.vendor_libraries = "third.a"
+```
+	
 ### 结束
 
 祝好运，pod trunk 命令有毒。后面有时间，作者会再更新，写一些创建新版本组件的内容。
