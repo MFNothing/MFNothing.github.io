@@ -20,17 +20,14 @@ tags:
 * repo 代表一个仓库，用来存放 pod 描述文件（.podspec）的地方。
 * 通过 **pod repo** 命令我们可以看到我们的本地的所有 repo 仓库。其中 URL 表示是仓库的git地址。如果我们没有私有库，通常只会存在一个叫 master 的 repo 仓库。也可以通过 **cd ~/.cocoapods/repos** 命令，直接到目录查看。
 
-```
-lymdeMacBook-Pro:~ lym$ pod repo 
-
-master
-- Type: git (master)
-- URL:  https://github.com/CocoaPods/Specs.git
-- Path: /Users/lym/.cocoapods/repos/master
-
-1 repo
-```
-
+	```
+	lymdeMacBook-Pro:~ lym$ pod repo 
+	master
+	- Type: git (master)
+	- URL:  https://github.com/CocoaPods/Specs.git
+	- Path: /Users/lym/.cocoapods/repos/master
+	1 repo
+	```
 * pod 描述文件（.podspec）是用来告诉 pod 怎样去生成我们的组件的文件。我们通过配置这个文件来实现私有库的基本配置。（包括库的名字，来源，资源文件目录等，后面会具体介绍怎么写这个文件）
 * 我们以往的执行 **pod install** 命令，具体就是从repo库源地址去查找配置文件，如果 repo 库在本地存在，就从本地路径去查找有没有我们要安装的组件，有就安装，没有就报错。一般情况下我们不会在 podfile 文件里面去写 **source 'https://github.com/CocoaPods/Specs.git'** 因为默认会先从本地的 master 这个 repo 库找。如果我们使用私有库就需要去添加这个源，表示先从这个 repo 库地址去查找。
 * 所以当你去使用其他第三方库，出现找不到库的情况的时候，就可以通过 **pod repo update** 更新这个本地 repo 库。
@@ -99,9 +96,7 @@ end
 
 	```
 	lymdeMacBook-Pro:MINTemp lym$ pod lib lint
-	
  	-> MINTemp (0.0.1)
-	
 	MINTemp passed validation.
 	```
 8. 提交的你的组件库代码，并打一个 tag，这个 tag 号一定要跟你 pod 描述文件中的 s.version 一致。这样以后你每次修改提交之后，都打一个新的tag，这样就可以生成一个新的版本。（后面会讲怎么删除tag）
@@ -124,11 +119,8 @@ end
 	```
 	source 'https://gitee.com/MFNothing/MINRepo.git'
 	source 'https://github.com/CocoaPods/Specs.git'
-
 	platform :ios, '9.0'
-
 	use_frameworks!
-
 	target 'MINTestPod' do
  	pod 'MINTemp'
  	#, :path => '/Users/lym/Desktop/github/MINTemp/MINTemp.podspec' 
@@ -166,6 +158,14 @@ end
 
 	```
 	pod repo update
+	```
+8. 成功之后会显示
+
+	```
+	- Data URL: https://raw.githubusercontent.com/CocoaPods/Specs/1d0a4486fd45cf77cbccfcce1f8d65e376e8bd21/Specs/7/b/1/MINTemp/0.0.1/MINTemp.podspec.json
+	- Log messages:
+	- May 21st, 03:14: Push for `MINTemp 0.0.1' initiated.
+	- May 21st, 03:14: Push for `MINTemp 0.0.1' has been pushed (1.806639077 s).
 	```
 	
 ### 结束
