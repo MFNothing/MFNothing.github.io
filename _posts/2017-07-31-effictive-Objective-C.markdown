@@ -538,6 +538,11 @@ Objective-C 这门语言没有办法指明某个基类是”抽象的“。于�
     }
 ```
 
+**isKindOfClass 和 isMemberOfClass的区别**
+
+* isKindOfClass : 返回一个布尔值，该值指示接收方是给定类的实例还是从该类继承的任何类的实例。
+* isMemberOfClass : 返回一个布尔值，该值指示接收方是否为给定类的实例。
+
 **要点**
 
 * 类族模式可以把实现细节隐藏在一套简单的公共接口后面。
@@ -546,9 +551,253 @@ Objective-C 这门语言没有办法指明某个基类是”抽象的“。于�
 
 ### 第10条：在既有类中使用关联对象存放自定义数据
 
+通过关联对象，向对象中存放一些我们需要的信息。
+
+其实就是给某个对象增加一个对象属性。主要方法包括: 
+
+* 设置关联对象
+	
+	```
+	void objc_setAssociatedObject(id _Nonnull object, const void * _Nonnull key, id _Nullable value, objc_AssociationPolicy policy);
+	object 被关联的对象
+	key 关联对象的键，后面获取关联的对象就是用这个键
+	value 关联对象，设置为nil，会根据键去清除那个键对应的关联对象
+	police 关联对象的语义
+	```
+* 获取关联对象
+
+	```
+	id _Nullable objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key);
+	object 被关联的对象
+	key 关联对象的键，通过这个键去取对应的关联对象
+	```
+* 移除所有关联对象
+
+	```
+	void objc_removeAssociatedObjects(id _Nonnull object);
+	object 被关联的对象
+	```
+	
+其中 objc_AssociationPolicy 包括
+
+* OBJC_ASSOCIATION_ASSIGN 对应属性的 assign
+* OBJC_ASSOCIATION_RETAIN_NONATOMIC 对应属性的 nonatomic, retain
+* OBJC_ASSOCIATION_COPY_NONATOMIC 对应属性的 copy, nonatomic
+* OBJC_ASSOCIATION_RETAIN 对应属性的 retain
+* OBJC_ASSOCIATION_COPY 对应属性的 copy
+
+#### 简单使用
+
+```
+#import <objc/runtime.h>
+
+// 关联对象
+
+NSArray *array = [[NSArray alloc] initWithObjects: @"obj", nil];
+
+// 设置被关联对象
+
+NSObject *obj = [[NSObject alloc] init];
+objc_setAssociatedObject(obj, @"NSObjectArrayKey", array, OBJC_ASSOCIATION_COPY);
+
+// 获取关联对象
+
+NSArray *getArr = objc_getAssociatedObject(obj, @"NSObjectArrayKey");
+NSLog(@"%@", getArr);
+
+// 移除被关联对象，下面两种方式都可以
+   
+objc_removeAssociatedObjects(obj);
+//objc_setAssociatedObject(obj, @"NSObjectArrayKey", nil, OBJC_ASSOCIATION_COPY);
+```
+打印
+
+```
+2018-05-22 14:42:02.932239+0800 关联对象[8810:211450] (
+    obj
+)
+```
+
+**要点**
+
+* 可以通过“关联对象”机制来把两个对象连起来。
+* 定义关联对象时可指定内存管理语义，用以模仿定义属性时采用的“拥有关系”与“非拥有关系”。
+* 只有在其他做法不可行时才应选用关联对象，因为这种做法通常会引入难于查找的 bug。
+
 ### 第11条：理解 objc_msgSend 的作用
 
+#### 了解运行期
 
+由于 Objective-C 是 C 的超集，所以最好先理解 C 语言的函数调用方式。C 语言使用“静态绑定”，也就是说，在编译期就能决定运行时所应调用的函数。以下面代码为例
+
+```
+#import <stdio.h>
+
+void printHello() {
+    printf("Hello");
+}
+
+void printGoodbye() {
+    printf("Goodbye");
+}
+
+void doTheThing(int type) {
+    if (type == 0) {
+        printHello();
+    }else {
+        printGoodbye();
+    }
+}
+```
+
+上面的代码，如果不考虑“内联”（编译时，类似宏替换，使用函数体替换调用处的函数名，编译器对代码的优化），那么编译器在编译代码的时候就已经知道程序中有 printHello 和 printGoodbye 这两个函数了，于是会直接生成调用这些函数的指令。而函数地址实际上市硬编码在指令之中的。
+
+```
+#import <stdio.h>
+
+void printHello() {
+    printf("Hello");
+}
+
+void printGoodbye() {
+    printf("Goodbye");
+}
+
+void doTheThing(int type) {
+    void (*fnc)(void);
+    if (type == 0) {
+        fnc = printHello;
+    }else {
+        fnc = printGoodbye;
+    }
+    fnc();
+}
+```
+
+这时候就得使用“动态绑定”了，因为所要调用的函数知道运行期才能确定。在第一个例子中，if 和 else 语句里都有函数调用指令，编译期可以直接硬编码地址，等调用的时候直接根据 type 调到指定函数体里，而在第二个例子中只有一个函数调用指令，待调用的函数地址无法硬编码在指令中，而是要在运行期读出来。
+
+#### 了解 objc_msgSend
+
+在 Objective-C 中，如果向某对象传递消息，那就会使用动态绑定机制来决定需要调用的方法。
+
+给对象发消息一般是这样的形式
+
+```
+id returnValue = [someObject messageName: parameter];
+```
+
+上面例子中，someObject 叫做“接收者”，messageName 叫做 “选择子”（Selector）。选择子与参数合起来成为“消息”。
+
+编译期看到此消息后，会将其转换为一条标准的 C 语言函数调用，所调用的函数是消息传递机制中的核心函数，叫做 objc_msgSend。
+
+```
+id _Nullable objc_msgSend(id _Nullable self, SEL _Nonnull op, ...)
+```
+
+这是个可变参数函数，能接收两个或两个以上的参数。第一个参数代表接收者，第二个参数代表选择子（SEL 是选择子的类型），后续参数就是消息中的那些参数，其顺序不变。
+
+最终编译会把刚才那个例子中的消息转换为如下函数:
+
+```
+id returnValue = objc_msgSend(someObject, @selector(messageName:), parameter);
+```
+
+objc_msgSend 函数会依据接收者与选择子的类型来调用适当的方法。
+
+其过程如下 :
+
+1. 先在接收者所属的类中搜寻其“方法列表”，如果能找到与选择子名称相符的方法就跳至其实现代码。如果没有执行下一步。
+2. 再沿着集成体系继续向上查找，等找到合适的方法之后再跳转。如果还是找不到，执行第三步。
+3. 执行“消息派发”（message forwarding）操作，具体见第12条。
+
+objc_msgSend 会将匹配的结果缓存在“快速映射表”里面，每个类都有这样一块缓存，若是后面还有相同的消息，就可以很快执行。但是这个还是达不到“静态绑定的函数调用操作”那样迅速。
+
+**其他边界情况**，就是一些特殊情况。需要交给 Objective-C 运行环境中的另一些函数处理 :
+
+* objc_msgSend_stret 如果待发送的消息要返回结构体，那么可以交给此函数处理。但是返回的结构体太大，会由另一个函数派发。那个函数会通过分配在栈上的某个变量来处理。
+* objc_msgSend_fpret 如果消息返回的是浮点数，那么可以交给此函数处理。这个函数是为了处理 x85 等架构 CPU 中某些令人稍觉惊讶的奇怪状况。某些架构的 CPU 调用函数时需要对“浮点数寄存器”做特殊处理。
+* objc_msgSendSuper 如果要给超类发消息，那么可以交给此函数处理。例如 [super message: parameter]。
+
+Objective-C 对象的每个方法都可以视为简单的 C 函数，其原型如下 :
+
+```
+<return_type> Class_selector(id self, SEL _cmd, ...)
+```
+
+真正的函数名与上面写的可能不太一致。每个类中都有一张表格，其中的指针都会指向这种函数，而选择子的名称则是查表时所用的“键”。objc_msgSend 等函数正是通过这张表格来寻找应该执行的方法并跳至其实现的。
+
+这个函数的原型跟 objc_msgSend 函数很像，是为了利用 “尾函数优化”技术，令“跳至方法实现”这一操作变得更简单。
+
+如果某函数的最后一项操作是调用另外一个函数，那么就可以运用“尾函数优化”技术。编译器会生成调转至另一函数所需的指令码，而且不会向调用栈中推入新的“栈帧”。
+
+只有当某函数的最后一个操作仅仅是调用其他函数而不会将其返回值另做他用是，才能执行“尾调用优化”。
+
+这个优化对 objc_msgSend 非常关键，如果不这么做的话，那么会调用 Objective-C 方法之前，都需要为 objc_msgSend 函数准备“栈帧”，可以在“栈踪迹”中可以看到这种 “栈帧”。不优化可能导致“栈溢出”现象。
+
+“尾函数优化”可以看下面两段代码
+
+```
+int fun(int n)
+{
+    if (n == 0) {
+        return 1;
+    }
+    return fun(n-1) * n;
+}
+```
+
+这个例子中函数返回值被用来做计算了，所以无法做尾递归优化，所以当 n 很大的时候，会栈溢出。
+
+```
+int fun1(int n, int prev, int next)
+{
+    if (n == 1) {
+        return next;
+    }
+    return fun1(n-1, next, next + prev);
+}
+```
+
+像这个符合“尾递归优化”的，就可以使用“尾递归优化”技术进行优化，保证“栈帧”。即使不做优化，它能够计算的 n 值也比上一个大一些，因为它所需的栈更少。
+
+#### 简单使用 objc_msgSend
+
+现在能够正常使用 objc_msgSend 函数，有两种方式 :
+
+* ((void(*)(id, SEL, id))objc_msgSend)(obj, @selector(senMssage:), array);
+* 选中项目 - Project - Build Settings - ENABLE_STRICT_OBJC_MSGSEND  将其设置为 NO 
+
+推荐使用上面的方式调用。
+
+```
+#import <objc/message.h>
+
+@interface MINObject : NSObject
+- (void)senMssage:(NSArray *)arr;
+@end
+
+@implementation MINObject
+- (void)senMssage:(NSArray *)arr
+{
+    NSLog(@"senMssage :%@", arr);
+}
+@end
+
+- (void)userSendMsgSend
+{
+    NSArray *array = [[NSArray alloc] initWithObjects: @"obj", nil];
+    MINObject *obj = [[MINObject alloc] init];
+    SEL sel = @selector(senMssage:);
+    ((void(*)(id, SEL, id))objc_msgSend)(obj, @selector(senMssage:), array);
+    // objc_msgSend(obj, sel, array);
+}
+
+```
+
+**要点**
+
+* 消息由接收者、选择器及参数构成。给某对象“发送消息”也就相当于在该对象上“调用方法”。
+* 发给某对象的全部消息都要由“动态消息派发系统”来处理，该系统会查出对应的方法，并执行其代码。
 
 ## 接口与API设计
 ## 协议与分类
