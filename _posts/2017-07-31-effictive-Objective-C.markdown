@@ -799,6 +799,107 @@ int fun1(int n, int prev, int next)
 * 消息由接收者、选择器及参数构成。给某对象“发送消息”也就相当于在该对象上“调用方法”。
 * 发给某对象的全部消息都要由“动态消息派发系统”来处理，该系统会查出对应的方法，并执行其代码。
 
+### 第12条：理解消息转发机制
+
+当接收消息的对象无法响应消息的时候，就会启动“消息转发”机制，我们可以在此过程中告诉对象应该如何处理未知消息。其处理过程如下 :
+
+![](/img/in-mpost/Effective-Objective-C/消息转发流程.png)
+
+#### 动态方法解析
+
+对象在接收无法解读的消息后，首先将调用其所属类的下列类方法 : 
+
+```
++ (BOOL)resolveInstanceMethod:(SEL)sel;
+```
+
+该方法的参数就是那个未知的选择子，其返回值为 Boolean 类型，表示这个类是否能够新增一个实例方法以处理此选择子。在继续往下执行转发机制之前，本类有机会新增一个处理此选择子的方法。如果未实现的不是实例方法而是类方法，运行期系统会调用另一个方法 :
+
+```
++ (BOOL)resolveClassMethod:(SEL)sel;
+```
+
+**简单使用**
+
+```
+#import <Foundation/Foundation.h>
+
+@interface MINObject : NSObject
+
+@end
+
+#import "MINObject.h"
+#import <objc/runtime.h>
+
+@implementation MINObject
+
+- (void)resolveInstanceUnkownMethod:(NSString *)string
+{
+    NSLog(@"resolveInstanceUnkownMethod : %@", string);
+}
+
+void resolveClassUnknownCMethod(id self, SEL _cmd)
+{
+    NSLog(@"resolveClassUnknownMethod");
+}
+
++ (void)resolveClassUnknownObMethod
+{
+    NSLog(@"resolveClassUnknownMethod");
+}
+
++ (BOOL)resolveInstanceMethod:(SEL)sel
+{
+    NSString *selString = NSStringFromSelector(sel);
+    if ([selString isEqualToString: @"sendInstanceUnknownMethod:"]) {
+        class_addMethod([self class], sel, class_getMethodImplementation([self class],  @selector(resolveInstanceUnkownMethod:)), "v@:@");
+        return YES;
+    }
+    return [super resolveClassMethod: sel];
+}
+
++ (BOOL)resolveClassMethod:(SEL)sel
+{
+    NSString *selString = NSStringFromSelector(sel);
+    if ([selString isEqualToString: @"sendClassUnknownMethod"]) {
+        
+//        class_addMethod(objc_getMetaClass("MINObject"), sel, (IMP)resolveClassUnknownCMethod, "v@:");
+        
+        class_addMethod(object_getClass(self) , sel, class_getMethodImplementation(object_getClass(self),  @selector(resolveClassUnknownObMethod)), "v@:@");
+        return YES;
+    }
+    return [super resolveClassMethod: sel];
+}
+
+@end
+```
+
+使用
+
+```
+- (void)useResolveMethod
+{
+    [MINObject performSelector: @selector(sendClassUnknownMethod)];
+    MINObject *obj = [[MINObject alloc] init];
+    [obj performSelector: @selector(sendInstanceUnknownMethod:) withObject: @"hello"];
+}
+```
+
+这里要提几个地方 :
+
+* object_getClass : 这个获取的元对象的 Class，跟[self Class]不同，在 resolveClassMethod 方法中的添加方法，必须是添加类方法，所以必须获取这个。
+* “v@:@” : class_addMethod 方法中的描述添加方法参数和返回值的字符数组。这里表示的返回 void 传入 (id, _cmd, id)。具体参考文档 [Type Encodings
+](http://lbsyun.baidu.com/index.php?title=iossdk/sdkiosdev-download) 。
+* 我们声明的类方法和实例方法默认是会有两个参数的 (id self, SEL _cmd)。
+
+
+**要点**
+
+* 若对象无法响应某个选择子，则进入消息转发流程。
+* 通过运行期的动态方法解析功能，我们可以在需要用到某个方法时再将其加入类中。
+* 对象可以把其无法解读的某些选择子转交给其他对象来处理。
+* 经过上述两步之后，如果还是没办法处理选择子，那就启动完整的消息转发机制。
+
 ## 接口与API设计
 ## 协议与分类
 
@@ -2506,7 +2607,7 @@ dispatch_get_current_queue 返回的是当前的队列，但是当前队列是�
 }
 ```
 
-* dispatch_get_current_queue 函数的行为常常与开放着所预期的不同。此函数已经废弃，只应做调试之用。
+* dispatch_get_current_queue 函数的行为常常与开发者所预期的不同。此函数已经废弃，只应做调试之用。
 * 由于派发队列是按层级来组织的，所以无法单用某个队列对象来描述当前“当前队列”这一概念。
 * dispatch_get_current_queue 函数用于解决由于不可重入的代码所引发的死锁，然而能用此函数解决的问题，通常也能改用“队列特定数据”来解决。
 
