@@ -540,8 +540,8 @@ Objective-C 这门语言没有办法指明某个基类是”抽象的“。于�
 
 **isKindOfClass 和 isMemberOfClass的区别**
 
-* isKindOfClass : 返回一个布尔值，该值指示接收方是给定类的实例还是从该类继承的任何类的实例。
-* isMemberOfClass : 返回一个布尔值，该值指示接收方是否为给定类的实例。
+* isKindOfClass : 返回一个布尔值，该值能够判断出对象是否为某类或其派生类的实例。
+* isMemberOfClass : 返回一个布尔值，该值能够判断出对象是否为某个特定类的实例。
 
 **要点**
 
@@ -805,7 +805,7 @@ int fun1(int n, int prev, int next)
 
 ![](/img/in-mpost/Effective-Objective-C/消息转发流程.png)
 
-#### 动态方法解析
+#### 动态方法解析（resolveInstanceUnkownMethod 和 resolveClassMethod）
 
 对象在接收无法解读的消息后，首先将调用其所属类的下列类方法 : 
 
@@ -892,6 +892,129 @@ void resolveClassUnknownCMethod(id self, SEL _cmd)
 ](http://lbsyun.baidu.com/index.php?title=iossdk/sdkiosdev-download) 。
 * 我们声明的类方法和实例方法默认是会有两个参数的 (id self, SEL _cmd)。
 
+#### 备援接收者（forwardingTargetForSelector）
+
+当前接收者如果不能处理这个选择子（SEL），运行期这个时候会向当前接收者发消息，问它能不能把这条消息转给其他接收者来处理。
+
+```
+- (id)forwardingTargetForSelector:(SEL)aSelector;
+```
+
+注意这里是实例方法，所以是类对象发的消息，不能被类对象内部处理，以及动态解析才会到这里。返回一个可以处理这个消息的对象。
+
+**简单使用**
+
+在上面的 MINObject 添加下面的方法
+
+```
+#import "RedundancyObject.h"
+
+- (id)forwardingTargetForSelector:(SEL)aSelector
+{
+    NSString *selString = NSStringFromSelector(aSelector);
+    if ([selString isEqualToString: @"OnlyRedundancyObjectCanProcess"]) {
+        RedundancyObject *object = [[RedundancyObject alloc] init];
+        return object;
+    }
+    return nil;
+}
+```
+
+新增处理这个消息的类
+
+```
+#import <Foundation/Foundation.h>
+
+@interface RedundancyObject : NSObject
+
+@end
+
+#import "RedundancyObject.h"
+
+@implementation RedundancyObject
+
+- (void)OnlyRedundancyObjectCanProcess
+{
+    NSLog(@"OnlyRedundancyObjectCanProcess");
+}
+
+@end
+```
+
+使用
+
+```
+- (void)useForwardTarget
+{
+    MINObject *obj = [[MINObject alloc] init];
+    [obj performSelector: @selector(OnlyRedundancyObjectCanProcess)];
+}
+
+```
+#### 完整消息转发（forwardInvocation 和 methodSignatureForSelector）
+
+如果上面还没能处理消息，唯一能做的就是启用完整的消息转发机制了。
+
+首先创建 NSInvocation 对象，把与尚未处理的那条消息有关的全部细节封于其中。此对象包含选择子、目标（target）及参数。
+
+在触发 NSInvocation 对象时，“消息派发系统”（message-dispatch system）将亲自出马，把消息指派给目标对象。
+
+
+```
+- (void)forwardInvocation:(NSInvocation *)invocation;
+```
+
+这方法简单实现：只需要改变调用目标，使得消息在新目标上得以调用即可。但是这样实现跟“备援接收者”没啥区别。
+
+有用的实现：在触发消息前，先以某种方式改变消息内容，比如追加一个参数，或是改变选择子，等等。
+
+如果发现某调用操作不应由本类处理，则需调用超类的同名方法。这样继承体系中每个类都有机会处理此调用请求，直至 NSObject。如果 NSObject 还不能处理，就会调用 “doesNotRecognizeSelector:”以抛出异常。
+
+```
+- (void)forwardInvocation:(NSInvocation *)anInvocation
+{
+    NSLog(@"forwardInvocation");
+    RedundancyObject *object = [[RedundancyObject alloc] init];
+    [object performSelector: anInvocation.selector];
+}
+
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector
+{
+    if (aSelector == @selector(OnlyInvocationObjCanProcess)) {
+        
+        //        return [NSMethodSignature methodSignatureForSelector: aSelector];
+        
+        // 注意为啥不能用上面那个创建，因为上面那个方法本来就是找不到，才过来的，你还用它创建 NSMethodSignature， 能被创建出来才有鬼
+        
+        return [NSMethodSignature signatureWithObjCTypes: "v@:"];
+    }
+    return [super methodSignatureForSelector: aSelector];
+}
+```
+
+在调用这个方法之前，我们需要重写 methodSignatureForSelector，返回一个 NSMethodSignature （方法签名，描述方法有哪些参数和返回值的），来协助消息转发，如果不实现这个方法，无法到达 forwardInvocation 方法里。
+
+#### 简单了解一下 NSInvocation 和 NSMethodSignature
+
+通过 NSInvocation 调用方法。
+
+```
+- (void)userInvocationDoSomeThing
+{
+    NSMethodSignature *methodSign = [self methodSignatureForSelector: @selector(doSomeThing:)];
+    NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:methodSign];
+    [invocation setTarget: self];
+    [invocation setSelector: @selector(doSomeThing:)];
+    NSString *argument = @"doSomeThing";
+    [invocation setArgument: &argument atIndex: 2];
+    [invocation invoke];
+}
+
+- (void)doSomeThing:(NSString *)someThingString
+{
+    NSLog(@"%@", someThingString);
+}
+```
 
 **要点**
 
@@ -899,6 +1022,176 @@ void resolveClassUnknownCMethod(id self, SEL _cmd)
 * 通过运行期的动态方法解析功能，我们可以在需要用到某个方法时再将其加入类中。
 * 对象可以把其无法解读的某些选择子转交给其他对象来处理。
 * 经过上述两步之后，如果还是没办法处理选择子，那就启动完整的消息转发机制。
+* 步骤越往后处理消息需要付出的代价会越来越大。
+
+### 第13条：用“方法调配技术”调试“黑盒方法”
+
+简单来说就是通过运行期方法交换两个方法。
+
+类的方法列表会把选择子的名称映射到相关的方法实现之上，使得“动态消息派发系统”能够据此找到应该调用的方法。这些方法均以函数指针的形式来表示，这种指针叫做 IMP，其原型如下：
+
+```
+id (*IMP)(id, SEL, ...)
+```
+
+交换方法的方法
+
+```
+void method_exchangeImplementations(Method _Nonnull m1, Method _Nonnull m2) 
+```
+
+Method，在类定义中表示方法的不透明类型。
+
+此函数的两个参数表示带交换的两个方法实现，可以通过下面的方法获得
+
+```
+Method _Nullable class_getInstanceMethod(Class _Nullable cls, SEL _Nonnull name)
+```
+
+注意上面的获取的是实例方法的实现，不要获取类方法的了。
+
+简单使用，交换 NSString 的小写字体和大写字体两个方法。
+
+```
+- (void)exchangeMethod
+{
+    Method lowercaseStringMethod = class_getInstanceMethod([NSString class], @selector(lowercaseString));
+    Method uppercaseStringMethod = class_getInstanceMethod([NSString class], @selector(uppercaseString));
+    method_exchangeImplementations(lowercaseStringMethod, uppercaseStringMethod);
+    NSString *testString = @"MFNothing";
+    NSLog(@"lowercaseString : %@", [testString lowercaseString]);
+    NSLog(@"uppercaseString : %@", [testString uppercaseString]);
+}
+```
+
+打印
+
+```
+2018-05-28 11:06:47.472281+0800 方法调配[7631:218547] lowercaseString : MFNOTHING
+2018-05-28 11:06:47.472430+0800 方法调配[7631:218547] uppercaseString : mfnothing
+```
+
+通常我们通过这一手段来为既有方法的实现增添新功能。比如想要在调用 lowercaseString 时记录某些信息，这是就可以通过交换方法来达成此目标。
+
+新增分类，添加一个用于交换的方法。
+
+```
+#import <Foundation/Foundation.h>
+
+@interface NSString (MINAdditions)
+
+- (NSString *)min_myLowercaseString;
+
+@end
+
+#import "NSString+MINAdditions.h"
+
+@implementation NSString (MINAdditions)
+
+- (NSString *)min_myLowercaseString
+{
+    NSString *lowerString = [self min_myLowercaseString];
+    NSLog(@"min_myLowercaseString : %@", lowerString);
+    return lowerString;
+}
+
+@end
+```
+
+注意这里并不会出现死循环，当我们在使用的时候，调用 lowercaseString 方法的时候，进入这里，然后调用 min_myLowercaseString 方法的时候，进入的其实是原来 lowercaseString 的方法实现的地方，不是这里。
+
+```
+
+- (void)addSomeLogInLowercaseStringMethod
+{
+    Method lowercaseStringMethod = class_getInstanceMethod([NSString class], @selector(lowercaseString));
+    Method min_myLowercaseStringMethod = class_getInstanceMethod([NSString class], @selector(min_myLowercaseString));
+    method_exchangeImplementations(lowercaseStringMethod, min_myLowercaseStringMethod);
+    NSString *testString = @"MFNothing";
+    [testString lowercaseString];
+}
+
+---打印---
+
+2018-05-28 11:23:20.936679+0800 方法调配[7959:232560] min_myLowercaseString : mfnothing
+```
+
+**要点**
+
+* 在运行期，可以向类中新增或替换选择子所对应的方法实现。
+* 使用另一份实现来替换原有的方法实现，这道工序叫做“方法调配”，开发者常用此项技术向原有实现中添加新功能。
+* 一般来说，只有调试程序的时候才需要在运行期修改方法实现，这种做法不宜滥用。
+
+### 第14条：理解“类对象”的用意
+
+```
+/// An opaque type that represents an Objective-C class.
+typedef struct objc_class *Class;
+
+/// Represents an instance of a class.
+struct objc_object {
+    Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
+};
+
+/// A pointer to an instance of a class.
+typedef struct objc_object *id;
+```
+
+从上面我们可以知道 id 是一个指向类实例的指针。在 Objective-C 中，id 可以指代任意的 Objective-C 对象类型。
+
+objc_object 代表一个类实例。
+
+Class 表示Objective-C类的不透明类型。
+
+每个对象结构体（objc_object）的首个成员是 Class 类型的变量。该变量定义了对象所属的类，通常称为“is a”指针。
+
+Class 在运行期程序库的头文件中的定义 ：
+
+```
+struct objc_class {
+    Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
+
+#if !__OBJC2__
+    Class _Nullable super_class                              OBJC2_UNAVAILABLE;
+    const char * _Nonnull name                               OBJC2_UNAVAILABLE;
+    long version                                             OBJC2_UNAVAILABLE;
+    long info                                                OBJC2_UNAVAILABLE;
+    long instance_size                                       OBJC2_UNAVAILABLE;
+    struct objc_ivar_list * _Nullable ivars                  OBJC2_UNAVAILABLE;
+    struct objc_method_list * _Nullable * _Nullable methodLists                    OBJC2_UNAVAILABLE;
+    struct objc_cache * _Nonnull cache                       OBJC2_UNAVAILABLE;
+    struct objc_protocol_list * _Nullable protocols          OBJC2_UNAVAILABLE;
+#endif
+
+} OBJC2_UNAVAILABLE;
+```
+
+此结构体存放类的“元数据”。首个变量也是 isa 指针，这说明 Class 本身亦为 Objective-C 对象。
+
+* isa 指向类对象所属类型，这个累叫做“元类”，用来表述类对象本身所具备的元数据。比如类方法就定义于此。
+* super_class 定义本类的超类。
+* 每个类仅有一个“类对象”，而每个“类对象”仅有一个与之相关的“元类”。
+
+![](/img/in-mpost/Effective-Objective-C/isa.png)
+
+super_class 指针确立了继承关系，而 isa 指针描述了实例所属的类。
+
+#### 在类继承体系中查询类型信息
+
+前面介绍过下面两种方法来判断类是否相同。
+
+* isKindOfClass : 返回一个布尔值，该值能够判断出对象是否为某类或其派生类的实例。
+* isMemberOfClass : 返回一个布尔值，该值能够判断出对象是否为某个特定类的实例。
+
+像这种类型信息查询的方法使用 isa 指针获取对象所属的类，然后通过 super_class 指针在继承体系中游走。
+
+
+
+**要点**
+
+* 每个实例都有一个指向 Class 对象的指针，用以表明其类型，而这些 Class 对象则构成了类的继承体系。
+* 如果对象类型无法在编译期确定，那么就应该使用类型信息查询方法来探知。
+* 尽量使用类型信息查询方法来确定对象类型，而不要直接比较类对象，因为某些对象可能实现消息转发功能。
 
 ## 接口与API设计
 ## 协议与分类
