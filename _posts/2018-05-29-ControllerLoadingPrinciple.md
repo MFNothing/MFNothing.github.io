@@ -13,15 +13,41 @@ tags:
 
 ## 控制器view加载原理
 
-### 几种非纯代码创建控制器的方式
+### 几种与视图相关创建控制器的方式
 
 **创建跟控制器相同名称的xib文件**
 
 ![](/img/in-mpost/Controller-Loading-Principle/CreateController1.gif)
 
-**先创建一个控制器，然后将一个xib与之关联**
+```
+FirstViewController *vc = [[FirstViewController alloc] init];
+```
+
+**先创建一个控制器，然后将一个xib的view与控制器的view关联**
 
 ![](/img/in-mpost/Controller-Loading-Principle/CreateController2.gif)
+
+这个方式跟第一个创建方式差不多，只是第一种方式默认做了第二种关联 view 的操作。
+
+```
+SecondViewController *vc = [[SecondViewController alloc] init];
+```
+
+**先创建一个控制器，然后将一个xib中的控制器与之关联**
+
+![](/img/in-mpost/Controller-Loading-Principle/CreateController3.gif)
+
+```
+ThirdViewController *vc = [[[NSBundle mainBundle] loadNibNamed: @"ThirdViewController" owner: nil options: nil] lastObject];
+```
+
+**先创建一个控制器，然后将storyboard中的一个控制器与之关联**
+
+![](/img/in-mpost/Controller-Loading-Principle/CreateController4.gif)
+
+```
+FourthViewController *vc = [[UIStoryboard storyboardWithName: @"Main" bundle: nil] instantiateViewControllerWithIdentifier: @"FourthViewController"];
+```
 
 
 ### 定义一个控制器
