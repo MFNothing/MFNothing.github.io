@@ -8,7 +8,7 @@ header-img: "img/post-bg-nextgen-web-pwa.jpg"
 header-mask: 0.3
 catalog:    true
 tags:
-    - Application
+    - Cocoapods
 ---
 
 ## Cocoapods私有仓库和公共库的创建和使用

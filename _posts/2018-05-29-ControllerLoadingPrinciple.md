@@ -8,7 +8,7 @@ header-img: "img/post-bg-nextgen-web-pwa.jpg"
 header-mask: 0.3
 catalog:    true
 tags:
-    - Application
+    - UIViewController
 ---
 
 ## 控制器view加载原理
