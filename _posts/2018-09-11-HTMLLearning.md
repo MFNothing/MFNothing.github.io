@@ -631,8 +631,86 @@ p {color:blue}
 
 **`<form>`**
 
+HTML 表单用于收集用户输入。`<form> `元素定义 HTML 表单。
+
+* HTML 表单包含表单元素。表单元素指的是不同类型的 input 元素：文本输入、复选框、单选按钮、提交按钮等等。
+* 文本输入 `<input type="text">`
+ * 需要注意当提交表单的时候，必须有 name 属性，且可以设置默认填充值
+ * `<input type="text" name="get请求中&左边显示内容" value="默认填充值">`
+* 单选按钮输入 `<input type="radio">`
+ * 需要注意只有相同 name 属性的才有单选效果，且带有checked属性的是默认选中的
+ * 然后这个默认只是一个按钮，没有文字的，添加文字需要在标签后面加
+ * `<input type="radio" name="radioname" value="get请求中&右边显示的内容" checked>`
+* 提交按钮 `<input type="submit">`
+ * 定义用于向表单处理程序（form-handler）提交表单的按钮。
+ * 表单处理程序通常是包含用来处理输入数据的脚本的服务器页面。
+ * 表单处理程序在表单的 action 属性中指定。
+ * `<input type="submit" value="按钮名">`
+* Action 属性
+ * action 属性定义在提交表单时执行的动作。
+ * 通常，表单会被提交到 web 服务器上的网页。
+ * `<form action="action_page.php">`
+* Method 属性
+ * method 属性规定在提交表单时所用的 HTTP 方法（GET 或 POST）
+ * `<form action="action_page.php" method="GET">`
+ * `<form action="action_page.php" method="POST">`
+ * 需要注意的是，表单数据在页面地址栏中是可见的：`action_page.php?firstname=Mickey&lastname=Mouse`，并且 GET 最适合少量数据的提交。浏览器会设定容量限制。
+ * POST 的安全性更加，因为在页面地址栏中被提交的数据是不可见的。
+* Name 属性
+ * 如果要正确地被提交，每个输入字段必须设置一个 name 属性。就是表单元素。否则提交不上去。
+* 用 `<fieldset>` 组合表单数据
+ * `<legend>` 元素为 `<fieldset>` 元素定义标题。
+ * 就是把在其中的表元素包起来。
+* Form 可选属性
+ * `<form action="action_page.php" method="GET" target="_blank" accept-charset="UTF-8" ectype="application/x-www-form-urlencoded" autocomplete="off" novalidate>.form elements.</form>`
 
 
+|属性	|描述|
+|---|---|
+|accept-charset	|规定在被提交表单中使用的字符集（默认：页面字符集）。|
+|action	|规定向何处提交表单的地址（URL）（提交页面）。|
+|autocomplete	|规定浏览器应该自动完成表单（默认：开启）。|
+|enctype	|规定被提交数据的编码（默认：url-encoded）。|
+|method	|规定在提交表单时所用的 HTTP 方法（默认：GET）。|
+|name	|规定识别表单的名称（对于 DOM 使用：document.forms.name）。|
+|novalidate	|规定浏览器不验证表单。|
+|target	|规定 action 属性中地址的目标（默认：_self）。|
+
+
+#### 表单元素
+ 
+* `<input>` 元素，主要根据 type 属性变化多个形态。
+ * `<input type="checkbox">` 定义复选框。
+ * HTML5 增加了多个新的输入类型
+ * color
+ * date
+ * datetime
+ * datetime-local
+ * email
+ * month
+ * number
+ * range
+ * search
+ * tel
+ * time
+ * url
+ * week
+* `<select>` 元素（下拉列表）
+ * `<option>` 元素定义待选择的选项。
+ * 列表通常会把首个选项显示为被选选项。
+ * 您能够通过添加 selected 属性来定义预定义选项。
+ * `<option value="fiat" selected>Fiat</option>`
+ * `<select name = "name"> <option value = "flat"> Flat </option> </select>`
+* `<textarea>` 元素
+ * `<textarea>` 元素定义多行输入字段（文本域）
+ * `<textarea name="message" rows="10" cols="30"> text </textarea>`
+* `<button>` 元素
+ * `<button type="button" onclick="alert('Hello World!')">Click Me!</button>`
+* HTML5 `<datalist>` 元素
+ * `<datalist>` 元素为 `<input>` 元素规定预定义选项列表。
+ * 用户会在他们输入数据时看到预定义选项的下拉列表。
+ * ` <input>` 元素的 list 属性必须引用 `<datalist>` 元素的 id 属性。
+ * `<input list="browsers"> <datalist id="browsers"> <option value="Safari"> </datalist> </form>`
 
 
 
