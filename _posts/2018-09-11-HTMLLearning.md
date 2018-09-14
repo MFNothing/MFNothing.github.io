@@ -711,9 +711,3 @@ HTML 表单用于收集用户输入。`<form> `元素定义 HTML 表单。
  * 用户会在他们输入数据时看到预定义选项的下拉列表。
  * ` <input>` 元素的 list 属性必须引用 `<datalist>` 元素的 id 属性。
  * `<input list="browsers"> <datalist id="browsers"> <option value="Safari"> </datalist> </form>`
-
-
-
-![](/img/in-mpost/TableView/iOS_UIView_Display.png)
-
-[这个大神的文章](https://blog.ibireme.com/2015/11/12/smooth_user_interfaces_for_ios/)
