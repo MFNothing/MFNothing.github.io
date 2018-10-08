@@ -63,12 +63,12 @@ tags:
 
 * HTML 标签可以拥有属性。属性提供了有关 HTML 元素的更多的信息。
 * 属性总是以名称/值对的形式出现，比如：name="value"。
- * 属性和属性值对大小写不敏感。
- * 推荐小写属性和属性值。
+	* 属性和属性值对大小写不敏感。
+	* 推荐小写属性和属性值。
 * 属性总是在 HTML 元素的开始标签中规定。
 * 始终为属性值加引号。
- * 属性值应该始终被包括在引号内。双引号是最常用的，不过使用单引号也没有问题。
- * 在某些个别的情况下，比如属性值本身就含有双引号，那么您必须使用单引号，如`name='some"new"'`
+	* 属性值应该始终被包括在引号内。双引号是最常用的，不过使用单引号也没有问题。
+	* 在某些个别的情况下，比如属性值本身就含有双引号，那么您必须使用单引号，如`name='some"new"'`
 
 适用于大多数HTML元素的属性
 
@@ -159,14 +159,14 @@ tags:
 当浏览器读到一个样式表，它就会按照这个样式表来对文档进行格式化。有以下三种方式来插入样式表：
 
 * 外部样式表
- * 当样式需要被应用到很多页面的时候，外部样式表将是理想的选择。使用外部样式表，你就可以通过更改一个文件来改变整个站点的外观。
- * 通过引入一个css文件来改变样式 `<link rel="stylesheet" type="text/css" href="/html/csstest1.css" >`
+	* 当样式需要被应用到很多页面的时候，外部样式表将是理想的选择。使用外部样式表，你就可以通过更改一个文件来改变整个站点的外观。
+	* 通过引入一个css文件来改变样式 `<link rel="stylesheet" type="text/css" href="/html/csstest1.css" >`
 * 内部样式表
- * 当单个文件需要特别样式时，就可以使用内部样式表。你可以在 head 部分通过 `<style>` 标签定义内部样式表。 
- * `<style type="text/css"> body {background-color: red} p {margin-left: 20px} </style>` 这里修改了body标签和p标签的样式。
+	* 当单个文件需要特别样式时，就可以使用内部样式表。你可以在 head 部分通过 `<style>` 标签定义内部样式表。 
+	* `<style type="text/css"> body {background-color: red} p {margin-left: 20px} </style>` 这里修改了body标签和p标签的样式。
 * 内联样式
- * 当特殊的样式需要应用到个别元素时，就可以使用内联样式。 使用内联样式的方法是在相关的标签中使用样式属性。样式属性可以包含任何 CSS 属性。以下实例显示出如何改变段落的颜色和左外边距。
- * `<p style="color: red; margin-left: 20px">xxx</p>`
+	* 当特殊的样式需要应用到个别元素时，就可以使用内联样式。 使用内联样式的方法是在相关的标签中使用样式属性。样式属性可以包含任何 CSS 属性。以下实例显示出如何改变段落的颜色和左外边距。
+	* `<p style="color: red; margin-left: 20px">xxx</p>`
 
 #### 链接 
 
@@ -174,16 +174,16 @@ tags:
 
 * 超链接可以是一个字，一个词，或者一组词，也可以是**一幅图像**，您可以点击这些内容来跳转到新的文档或者当前文档中的某个部分。
 * target 属性
- * 使用 Target 属性，你可以定义被链接的文档在何处显示。
- * 	可选字段 `_blank` `_parent` `_self` `_top` `framename`，注意`_top`可以跳出框架，如果你的页面被指定到某个框架内。
- *  `framename`主要用于跳转指定name属性的框架，比如`<iframe src="demo_iframe.html" name="iframe_a"></iframe>`，这个`<iframe>` 指定 name 为 iframe_a，那么我们可以这样写链接 `<a href="http://xxx" target="iframe_a">xxx</a>`这样我们点击链接的时候，这个iframe就会跳转到链接的地址。
- *  `<a href="http://xxx" target="_self">显示内容</a>`
+	* 使用 Target 属性，你可以定义被链接的文档在何处显示。
+	* 	可选字段 `_blank` `_parent` `_self` `_top` `framename`，注意`_top`可以跳出框架，如果你的页面被指定到某个框架内。
+	*  `framename`主要用于跳转指定name属性的框架，比如`<iframe src="demo_iframe.html" name="iframe_a"></iframe>`，这个`<iframe>` 指定 name 为 iframe_a，那么我们可以这样写链接 `<a href="http://xxx" target="iframe_a">xxx</a>`这样我们点击链接的时候，这个iframe就会跳转到链接的地址。
+	*  `<a href="http://xxx" target="_self">显示内容</a>`
 * name 属性
- * 使用 name 属性创建 HTML 页面中的书签。书签不会以任何方式显示。
- * name 属性规定锚（anchor）的名称。当使用命名锚（named anchors）时，我们可以创建直接跳至该命名锚（比如页面中某个小节）的链接，这样使用者就无需不停地滚动页面来寻找他们需要的信息了。
- * 命名锚的语法: `<a name="tips">锚（显示在页面上的文本）</a>`
- * 跳转锚的方式：同一文档内 `<a href="#tips">有用的提示</a>`; 其他页面内跳转 `<a href="http://xxxx#tips">有用的提示</a>`
- * 如果找不到锚，不会出错，会跳到文档顶部。
+	* 使用 name 属性创建 HTML 页面中的书签。书签不会以任何方式显示。
+	* name 属性规定锚（anchor）的名称。当使用命名锚（named anchors）时，我们可以创建直接跳至该命名锚（比如页面中某个小节）的链接，这样使用者就无需不停地滚动页面来寻找他们需要的信息了。
+	* 命名锚的语法: `<a name="tips">锚（显示在页面上的文本）</a>`
+	* 跳转锚的方式：同一文档内 `<a href="#tips">有用的提示</a>`; 其他页面内跳转 `<a href="http://xxxx#tips">有用的提示</a>`
+	* 如果找不到锚，不会出错，会跳到文档顶部。
  
 #### 图片 
 
@@ -242,13 +242,13 @@ tags:
 **`<ol>` `<ul>` `<li>` `<dl>`**
 
 * 无序列表使用 `<ul>`， unordered list
- * 无序列表是一个项目的列表，此列项目使用粗体圆点（典型的小黑圆圈）进行标记。
+	* 无序列表是一个项目的列表，此列项目使用粗体圆点（典型的小黑圆圈）进行标记。
 * 有序列表使用 `<ol>`， ordered list
- * 有序列表也是一列项目，列表项目使用数字进行标记
+	* 有序列表也是一列项目，列表项目使用数字进行标记
 * 定义列表 `<dl>` define list, `<dt>` start, `dd` end
- * 自定义列表不仅仅是一列项目，而是项目及其注释的组合。
- * 自定义列表以 `<dl>` 标签开始。每个自定义列表项以 `<dt>` 开始。每个自定义列表项的定义以 `<dd>` 开始。
- * 定义列表的列表项内部可以使用段落、换行符、图片、链接以及其他列表等等。
+	* 自定义列表不仅仅是一列项目，而是项目及其注释的组合。
+	* 自定义列表以 `<dl>` 标签开始。每个自定义列表项以 `<dt>` 开始。每个自定义列表项的定义以 `<dd>` 开始。
+	* 定义列表的列表项内部可以使用段落、换行符、图片、链接以及其他列表等等。
 * 列表元素 `<li>`
 * 使用 type 属性改变无序列表和有序列表的样式。
 * 列表可以嵌套
@@ -282,11 +282,11 @@ tags:
 **块元素与内联函数的区别**
 
 * 块元素
- * 块级元素在浏览器显示时，通常会以新行来开始（和结束）。
- * 例如 `<h1>` `<p>` `<ul>` `<table>`
+	* 块级元素在浏览器显示时，通常会以新行来开始（和结束）。
+	* 例如 `<h1>` `<p>` `<ul>` `<table>`
 * 内联元素
- * 内联元素在显示时通常不会以新行开始。
- * 例如 `<td>` `<a>` `<img>`
+	* 内联元素在显示时通常不会以新行开始。
+	* 例如 `<td>` `<a>` `<img>`
  
 **`<div>` 元素**
 
@@ -479,16 +479,16 @@ Copyright W3Schools.com
 
 * `<iframe src="URL"></iframe>`
 * 设置高度和宽度
- * height 和 width 属性用于规定 iframe 的高度和宽度。
- * 属性值的默认单位是像素，但也可以用百分比来设定（比如 "80%"）。
- * `<iframe src="demo_iframe.htm" width="200" height="200"></iframe>`
+	* height 和 width 属性用于规定 iframe 的高度和宽度。
+	* 属性值的默认单位是像素，但也可以用百分比来设定（比如 "80%"）。
+	* `<iframe src="demo_iframe.htm" width="200" height="200"></iframe>`
 * 删除边框
- * frameborder 属性规定是否显示 iframe 周围的边框。
- * 设置属性值为 "0" 就可以移除边框。
- * `<iframe src="demo_iframe.htm" frameborder="0"></iframe>`
+	* frameborder 属性规定是否显示 iframe 周围的边框。
+	* 设置属性值为 "0" 就可以移除边框。
+	* `<iframe src="demo_iframe.htm" frameborder="0"></iframe>`
 * 使用 iframe 作为链接的目标
- * iframe 可用作链接的目标（target）。 如 `<a href="http://xxx" target="iframe_a">xxxx</a>`
- * 链接的 target 属性必须引用 iframe 的 name 属性。如 `<iframe src="demo_iframe.htm" name="iframe_a"></iframe>`
+	* iframe 可用作链接的目标（target）。 如 `<a href="http://xxx" target="iframe_a">xxxx</a>`
+	* 链接的 target 属性必须引用 iframe 的 name 属性。如 `<iframe src="demo_iframe.htm" name="iframe_a"></iframe>`
 
 #### 头部元素
 
@@ -570,17 +570,17 @@ p {color:blue}
 **`<meta>` 元素**
 
 * `<meta>` 标签提供关于 HTML 文档的元数据。元数据不会显示在页面上，但是对于机器是可读的。
- * 元数据（metadata）是关于数据的信息。
- * 典型的情况是，meta 元素被用于规定页面的描述、关键词、文档的作者、最后修改时间以及其他元数据。
- * `<meta>` 标签始终位于 head 元素中。
- * 元数据可用于浏览器（如何显示内容或重新加载页面），搜索引擎（关键词），或其他 web 服务。
+	* 元数据（metadata）是关于数据的信息。
+	* 典型的情况是，meta 元素被用于规定页面的描述、关键词、文档的作者、最后修改时间以及其他元数据。
+	* `<meta>` 标签始终位于 head 元素中。
+	* 元数据可用于浏览器（如何显示内容或重新加载页面），搜索引擎（关键词），或其他 web 服务。
 * 一些搜索引擎会利用 meta 元素的 name 和 content 属性来索引您的页面。
- * meta 元素定义页面的描述 `<meta name="description" content="Free Web tutorials on HTML, CSS, XML" />`
- * meta 元素定义页面的关键词 `<meta name="keywords" content="HTML, CSS, XML" />`
+	* content 属性定义页面的描述 `<meta name="description" content="Free Web tutorials on HTML, CSS, XML" />`
+	* name 属性定义页面的关键词 `<meta name="keywords" content="HTML, CSS, XML" />`
 
- **`<script>` 元素**
+**`<script>` 元素**
  
- * `<script> `标签用于定义客户端脚本，比如 JavaScript。
+* `<script> `标签用于定义客户端脚本，比如 JavaScript。
 
 #### 字符实体
 
@@ -613,19 +613,19 @@ p {color:blue}
 * URL(Uniform Resource Locator/统一资源定位器) 也被称为网址。
 * URL 可以由单词组成，比如 “w3school.com.cn”，或者是因特网协议（IP）地址：192.168.1.253。大多数人在网上冲浪时，会键入网址的域名，因为名称比数字容易记忆。
 * 语法规则
- * `scheme://host.domain:port/path/filename`
- * `http://www.w3school.com.cn/html/index.asp`
- * scheme - 定义因特网服务的类型。最常见的类型是 http
- * host - 定义域主机（http 的默认主机是 www）
- * domain - 定义因特网域名，比如 w3school.com.cn
- * :port - 定义主机上的端口号（http 的默认端口号是 80）
- * path - 定义服务器上的路径（如果省略，则文档必须位于网站的根目录中）。
- * filename - 定义文档/资源的名称
+	* `scheme://host.domain:port/path/filename`
+	* `http://www.w3school.com.cn/html/index.asp`
+	* scheme - 定义因特网服务的类型。最常见的类型是 http
+	* host - 定义域主机（http 的默认主机是 www）
+	* domain - 定义因特网域名，比如 w3school.com.cn
+	* :port - 定义主机上的端口号（http 的默认端口号是 80）
+	* path - 定义服务器上的路径（如果省略，则文档必须位于网站的根目录中）。
+	* filename - 定义文档/资源的名称
 * URL 编码
- * URL 只能使用 ASCII 字符集来通过因特网进行发送。
- * 由于 URL 常常会包含 ASCII 集合之外的字符，URL 必须转换为有效的 ASCII 格式。
- * URL 编码使用 "%" 其后跟随两位的十六进制数来替换非 ASCII 字符。
- * URL 不能包含空格。URL 编码通常使用 + 来替换空格。
+	* URL 只能使用 ASCII 字符集来通过因特网进行发送。
+	* 由于 URL 常常会包含 ASCII 集合之外的字符，URL 必须转换为有效的 ASCII 格式。
+	* URL 编码使用 "%" 其后跟随两位的十六进制数来替换非 ASCII 字符。
+	* URL 不能包含空格。URL 编码通常使用 + 来替换空格。
 
 #### 表单 
 
@@ -635,34 +635,34 @@ HTML 表单用于收集用户输入。`<form> `元素定义 HTML 表单。
 
 * HTML 表单包含表单元素。表单元素指的是不同类型的 input 元素：文本输入、复选框、单选按钮、提交按钮等等。
 * 文本输入 `<input type="text">`
- * 需要注意当提交表单的时候，必须有 name 属性，且可以设置默认填充值
- * `<input type="text" name="get请求中&左边显示内容" value="默认填充值">`
+	* 需要注意当提交表单的时候，必须有 name 属性，且可以设置默认填充值
+	* `<input type="text" name="get请求中&左边显示内容" value="默认填充值">`
 * 单选按钮输入 `<input type="radio">`
- * 需要注意只有相同 name 属性的才有单选效果，且带有checked属性的是默认选中的
- * 然后这个默认只是一个按钮，没有文字的，添加文字需要在标签后面加
- * `<input type="radio" name="radioname" value="get请求中&右边显示的内容" checked>`
+	* 需要注意只有相同 name 属性的才有单选效果，且带有checked属性的是默认选中的
+	* 然后这个默认只是一个按钮，没有文字的，添加文字需要在标签后面加
+	* `<input type="radio" name="radioname" value="get请求中&右边显示的内容" checked>`
 * 提交按钮 `<input type="submit">`
- * 定义用于向表单处理程序（form-handler）提交表单的按钮。
- * 表单处理程序通常是包含用来处理输入数据的脚本的服务器页面。
- * 表单处理程序在表单的 action 属性中指定。
- * `<input type="submit" value="按钮名">`
+	* 定义用于向表单处理程序（form-handler）提交表单的按钮。
+	* 表单处理程序通常是包含用来处理输入数据的脚本的服务器页面。
+	* 表单处理程序在表单的 action 属性中指定。
+	* `<input type="submit" value="按钮名">`
 * Action 属性
- * action 属性定义在提交表单时执行的动作。
- * 通常，表单会被提交到 web 服务器上的网页。
- * `<form action="action_page.php">`
+	* action 属性定义在提交表单时执行的动作。
+	* 通常，表单会被提交到 web 服务器上的网页。
+	* `<form action="action_page.php">`
 * Method 属性
- * method 属性规定在提交表单时所用的 HTTP 方法（GET 或 POST）
- * `<form action="action_page.php" method="GET">`
- * `<form action="action_page.php" method="POST">`
- * 需要注意的是，表单数据在页面地址栏中是可见的：`action_page.php?firstname=Mickey&lastname=Mouse`，并且 GET 最适合少量数据的提交。浏览器会设定容量限制。
- * POST 的安全性更加，因为在页面地址栏中被提交的数据是不可见的。
+	* method 属性规定在提交表单时所用的 HTTP 方法（GET 或 POST）
+	* `<form action="action_page.php" method="GET">`
+	* `<form action="action_page.php" method="POST">`
+	* 需要注意的是，表单数据在页面地址栏中是可见的：`action_page.php?firstname=Mickey&lastname=Mouse`，并且 GET 最适合少量数据的提交。浏览器会设定容量限制。
+	* POST 的安全性更加，因为在页面地址栏中被提交的数据是不可见的。
 * Name 属性
- * 如果要正确地被提交，每个输入字段必须设置一个 name 属性。就是表单元素。否则提交不上去。
+	* 如果要正确地被提交，每个输入字段必须设置一个 name 属性。就是表单元素。否则提交不上去。
 * 用 `<fieldset>` 组合表单数据
- * `<legend>` 元素为 `<fieldset>` 元素定义标题。
- * 就是把在其中的表元素包起来。
+	* `<legend>` 元素为 `<fieldset>` 元素定义标题。
+	* 就是把在其中的表元素包起来。
 * Form 可选属性
- * `<form action="action_page.php" method="GET" target="_blank" accept-charset="UTF-8" ectype="application/x-www-form-urlencoded" autocomplete="off" novalidate>.form elements.</form>`
+	* `<form action="action_page.php" method="GET" target="_blank" accept-charset="UTF-8" ectype="application/x-www-form-urlencoded" autocomplete="off" novalidate>.form elements.</form>`
 
 
 |属性	|描述|
@@ -680,34 +680,34 @@ HTML 表单用于收集用户输入。`<form> `元素定义 HTML 表单。
 #### 表单元素
  
 * `<input>` 元素，主要根据 type 属性变化多个形态。
- * `<input type="checkbox">` 定义复选框。
- * HTML5 增加了多个新的输入类型
- * color
- * date
- * datetime
- * datetime-local
- * email
- * month
- * number
- * range
- * search
- * tel
- * time
- * url
- * week
+	* `<input type="checkbox">` 定义复选框。
+	* HTML5 增加了多个新的输入类型
+	* color
+	* date
+	* datetime
+	* datetime-local
+	* email
+	* month
+	* number
+	* range
+	* search
+	* tel
+	* time
+	* url
+	* week
 * `<select>` 元素（下拉列表）
- * `<option>` 元素定义待选择的选项。
- * 列表通常会把首个选项显示为被选选项。
- * 您能够通过添加 selected 属性来定义预定义选项。
- * `<option value="fiat" selected>Fiat</option>`
- * `<select name = "name"> <option value = "flat"> Flat </option> </select>`
+	* `<option>` 元素定义待选择的选项。
+	* 列表通常会把首个选项显示为被选选项。
+	* 您能够通过添加 selected 属性来定义预定义选项。
+	* `<option value="fiat" selected>Fiat</option>`
+	* `<select name = "name"> <option value = "flat"> Flat </option> </select>`
 * `<textarea>` 元素
- * `<textarea>` 元素定义多行输入字段（文本域）
- * `<textarea name="message" rows="10" cols="30"> text </textarea>`
+	* `<textarea>` 元素定义多行输入字段（文本域）
+	* `<textarea name="message" rows="10" cols="30"> text </textarea>`
 * `<button>` 元素
- * `<button type="button" onclick="alert('Hello World!')">Click Me!</button>`
+	* `<button type="button" onclick="alert('Hello World!')">Click Me!</button>`
 * HTML5 `<datalist>` 元素
- * `<datalist>` 元素为 `<input>` 元素规定预定义选项列表。
- * 用户会在他们输入数据时看到预定义选项的下拉列表。
- * ` <input>` 元素的 list 属性必须引用 `<datalist>` 元素的 id 属性。
- * `<input list="browsers"> <datalist id="browsers"> <option value="Safari"> </datalist> </form>`
+	* `<datalist>` 元素为 `<input>` 元素规定预定义选项列表。
+	* 用户会在他们输入数据时看到预定义选项的下拉列表。
+	* ` <input>` 元素的 list 属性必须引用 `<datalist>` 元素的 id 属性。
+	* `<input list="browsers"> <datalist id="browsers"> <option value="Safari"> </datalist> </form>`
